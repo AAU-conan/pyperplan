@@ -2,6 +2,8 @@ from collections import defaultdict
 import logging
 
 from . import minisat
+from pyperplan.task import Task
+from typing import List
 
 
 # Max number of steps in a plan
@@ -18,7 +20,7 @@ def _formula_str(formula, sep="&"):
     return "({})".format(f" {sep} ".join(items))
 
 
-def index_fact(fact, index, negated=False):
+def index_fact(fact: str, index: int, negated: bool=False) -> str:
     """
     Returns a representation of 'fact' containing the step number and a
     leading 'not-' if the fact is negated
@@ -58,7 +60,7 @@ def get_formula_for_operator(facts, op, index):
     return formula
 
 
-def get_plan_formula(task, horizon):
+def get_plan_formula(task: Task, horizon: int) -> List[str]:
     """Returns a formula for a given task and number of steps"""
     init_true = list(sorted(task.initial_state))
     init_false = list(sorted(task.facts - task.initial_state))
@@ -115,7 +117,7 @@ def _extract_plan(operators, valuation):
     return plan
 
 
-def sat_solve(task, max_steps=HORIZON):
+def sat_solve(task: Task, max_steps: int=HORIZON):
     """Solves a planning task with a sat-solver.
 
     Returns a list of operators or None if no valid plan could be found

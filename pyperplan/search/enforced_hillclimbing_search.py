@@ -23,9 +23,12 @@ from collections import deque
 import logging
 
 from . import searchspace
+from pyperplan.heuristics.relaxation import hSAHeuristic
+from pyperplan.task import Operator, Task
+from typing import List
 
 
-def enforced_hillclimbing_search(planning_task, heuristic, use_preferred_ops=False):
+def enforced_hillclimbing_search(planning_task: Task, heuristic: hSAHeuristic, use_preferred_ops: bool=False) -> List[Operator]:
     """
     Searches for a plan on the given task using enforced hill climbing and
     duplicate detection.

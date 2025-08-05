@@ -30,7 +30,7 @@ class SearchNode:
     the node and the path length in the count of applied operators.
     """
 
-    def __init__(self, state: frozenset, parent: Optional[SearchNode], action: Optional[Operator], g: int):
+    def __init__(self, state: frozenset, parent: Optional['SearchNode'], action: Optional[Operator], g: int):
         """
         Construct a search node
 

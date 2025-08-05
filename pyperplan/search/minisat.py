@@ -4,6 +4,7 @@ import subprocess
 import sys
 
 from pyperplan import tools
+from typing import Dict, List
 
 
 INPUT = "input.cnf"
@@ -16,7 +17,7 @@ def minisat_available():
 
 
 class CnfWriter:
-    def _print_clause(self, clause):
+    def _print_clause(self, clause: List[str]):
         print(
             " ".join(str(self._literal_to_int(literal)) for literal in clause) + " 0",
             file=self.cnf_file,
@@ -29,7 +30,7 @@ class CnfWriter:
     def _get_aux_var(self):
         return next(self.count)
 
-    def _literal_to_int(self, literal):
+    def _literal_to_int(self, literal: str) -> int:
         if type(literal) is int:
             return literal
         negated = literal.startswith("not-")
@@ -61,7 +62,7 @@ class CnfWriter:
         not_var2 = "not-" + var2 if type(var2) is str else -var2
         return aux, [[-aux, var1], [-aux, var2], [not_var1, not_var2, aux]]
 
-    def write(self, formula):
+    def write(self, formula: List[str]) -> Dict[str, int]:
         """Adds helper variables for all occurences of "a2<->a1" """
         self.count = itertools.count(start=1)
         self.vars_to_numbers = dict()
@@ -157,7 +158,7 @@ def retransform_output(names_to_numbers):
     return retransformed
 
 
-def solve(formula):
+def solve(formula: List[str]):
     """
     Transforms the formula into the format required by minisat,
     calls minisat with the transformed formula, retranslates the

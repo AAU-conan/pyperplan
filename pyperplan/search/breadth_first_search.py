@@ -23,9 +23,11 @@ from collections import deque
 import logging
 
 from . import searchspace
+from pyperplan.task import Operator, Task
+from typing import List
 
 
-def breadth_first_search(planning_task):
+def breadth_first_search(planning_task: Task) -> List[Operator]:
     """
     Searches for a plan on the given task using breadth first search and
     duplicate detection.

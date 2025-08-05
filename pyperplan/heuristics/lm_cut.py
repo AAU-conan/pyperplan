@@ -23,7 +23,9 @@ from heapq import *
 import logging
 
 from .heuristic_base import Heuristic
-from typing import Callable
+from typing import Set, Callable
+from pyperplan.search.searchspace import SearchNode
+from pyperplan.task import Task
 
 
 def _compare(op: str) -> Callable:
@@ -37,7 +39,7 @@ def _compare(op: str) -> Callable:
 
 
 class RelaxedFact:
-    def __init__(self, name):
+    def __init__(self, name: str):
         self.name = name
         self.hmax_value = float("inf")
         self.precondition_of = list()  # list of RelaxedOp
@@ -61,14 +63,14 @@ class RelaxedFact:
             [str(e) for e in self.effect_of],
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
     __repr__ = dump
 
 
 class RelaxedOp:
-    def __init__(self, name, cost_zero=False):
+    def __init__(self, name: str, cost_zero: bool=False):
         self.name = name
         # list of RelaxedFact
         self.precondition = list()
@@ -92,7 +94,7 @@ class RelaxedOp:
         _compare, ["__lt__", "__leq__", "__gt__", "__geq__"]
     )
 
-    def clear(self, clear_op_cost):
+    def clear(self, clear_op_cost: bool):
         """This method resets the operator values to its defaults.
 
         It is called during the hmax computation on each operator.
@@ -107,7 +109,7 @@ class RelaxedOp:
         self.hmax_supporter = None
         self.hmax_value = float("inf")
 
-    def dump(self):
+    def dump(self) -> str:
         return (
             "< OPERATOR name: %s, "
             "hmax_supp: %s, precond: %s, effects: %s, cost: %d >"
@@ -141,7 +143,7 @@ class LmCutHeuristic(Heuristic):
     explicit_goal = "GOAL"
     goal_operator_name = "GOALOP"
 
-    def __init__(self, task):
+    def __init__(self, task: Task):
         self.relaxed_facts = dict()  # fact name -> RelaxedFact
         self.relaxed_ops = dict()
         self.reachable = set()
@@ -150,7 +152,7 @@ class LmCutHeuristic(Heuristic):
 
         self._compute_relaxed_facts_and_operators(task)
 
-    def _compute_relaxed_facts_and_operators(self, task):
+    def _compute_relaxed_facts_and_operators(self, task: Task):
         """Store all facts from the task as relaxed facts into our dict."""
 
         # little helper functions that build the relaxed operator graph
@@ -204,7 +206,7 @@ class LmCutHeuristic(Heuristic):
             assert fact in self.relaxed_facts
             link_op_to_precondition(goalop, fact)
 
-    def compute_hmax(self, state, clear_op_cost=True):
+    def compute_hmax(self, state: frozenset, clear_op_cost: bool=True):
         """Compute hmax values with a Dijkstra like procedure."""
         self.reachable.clear()
         facts_seen = set()
@@ -263,7 +265,7 @@ class LmCutHeuristic(Heuristic):
                             facts_seen.add(eff)
                             heappush(unexpanded, eff)
 
-    def compute_hmax_from_last_cut(self, state, last_cut):
+    def compute_hmax_from_last_cut(self, state: frozenset, last_cut: Set[RelaxedOp]):
         """This computes hmax values starting from the last cut.
 
         This saves us from recomputing the hmax values of all facts/operators
@@ -300,7 +302,7 @@ class LmCutHeuristic(Heuristic):
                                     next_op.hmax_value = supp.hmax_value + next_op.cost
                             heappush(unexpanded, next_op)
 
-    def compute_goal_plateau(self, fact_name):
+    def compute_goal_plateau(self, fact_name: str):
         """Recursively mark a goal plateau."""
         # assure the fact itself is not in an unreachable region
         fact_in_plateau = self.relaxed_facts[fact_name]
@@ -315,7 +317,7 @@ class LmCutHeuristic(Heuristic):
                 if op.cost == 0:
                     self.compute_goal_plateau(op.hmax_supporter.name)
 
-    def find_cut(self, state):
+    def find_cut(self, state: frozenset) -> Set[RelaxedOp]:
         """This returns the set of relaxed operators which are in the cut."""
         unexpanded = []
         facts_seen = set()
@@ -350,7 +352,7 @@ class LmCutHeuristic(Heuristic):
                             heappush(unexpanded, eff)
         return cut
 
-    def __call__(self, node):
+    def __call__(self, node: SearchNode) -> float:
         state = node.state
         heuristic_value = 0.0
         goal_state = self.relaxed_facts[self.explicit_goal]

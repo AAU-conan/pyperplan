@@ -23,9 +23,13 @@ import heapq
 import logging
 
 from . import searchspace
+from pyperplan.heuristics.relaxation import hAddHeuristic, hFFHeuristic, hMaxHeuristic, hSAHeuristic
+from pyperplan.search.searchspace import SearchNode
+from pyperplan.task import Operator, Task
+from typing import Callable, List, Tuple, Union
 
 
-def ordered_node_astar(node, h, node_tiebreaker):
+def ordered_node_astar(node: SearchNode, h: int, node_tiebreaker: int) -> Tuple[int, int, int, SearchNode]:
     """
     Creates an ordered search node (basically, a tuple containing the node
     itself and an ordering) for A* search.
@@ -40,7 +44,7 @@ def ordered_node_astar(node, h, node_tiebreaker):
     return (f, h, node_tiebreaker, node)
 
 
-def ordered_node_weighted_astar(weight):
+def ordered_node_weighted_astar(weight: int) -> Callable:
     """
     Creates an ordered search node (basically, a tuple containing the node
     itself and an ordering) for weighted A* search (order: g+weight*h).
@@ -67,7 +71,7 @@ def ordered_node_weighted_astar(weight):
     )
 
 
-def ordered_node_greedy_best_first(node, h, node_tiebreaker):
+def ordered_node_greedy_best_first(node: SearchNode, h: int, node_tiebreaker: int) -> Tuple[int, int, int, SearchNode]:
     """
     Creates an ordered search node (basically, a tuple containing the node
     itself and an ordering) for greedy best first search (the value with lowest
@@ -83,7 +87,7 @@ def ordered_node_greedy_best_first(node, h, node_tiebreaker):
     return (f, h, node_tiebreaker, node)
 
 
-def greedy_best_first_search(task, heuristic, use_relaxed_plan=False):
+def greedy_best_first_search(task: Task, heuristic: Union[hSAHeuristic, hMaxHeuristic], use_relaxed_plan: bool=False) -> List[Operator]:
     """
     Searches for a plan in the given task using greedy best first search.
 
@@ -96,7 +100,7 @@ def greedy_best_first_search(task, heuristic, use_relaxed_plan=False):
     )
 
 
-def weighted_astar_search(task, heuristic, weight=5, use_relaxed_plan=False):
+def weighted_astar_search(task: Task, heuristic: hAddHeuristic, weight: int=5, use_relaxed_plan: bool=False) -> List[Operator]:
     """
     Searches for a plan in the given task using A* search.
 
@@ -111,8 +115,8 @@ def weighted_astar_search(task, heuristic, weight=5, use_relaxed_plan=False):
 
 
 def astar_search(
-    task, heuristic, make_open_entry=ordered_node_astar, use_relaxed_plan=False
-):
+    task: Task, heuristic: Union[hFFHeuristic, hSAHeuristic, hMaxHeuristic, hAddHeuristic], make_open_entry: Callable=ordered_node_astar, use_relaxed_plan: bool=False
+) -> List[Operator]:
     """
     Searches for a plan in the given task using A* search.
 

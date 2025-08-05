@@ -25,6 +25,10 @@ import time
 
 from . import grounding, heuristics, search, tools
 from .pddl.parser import Parser
+from pyperplan.heuristics.relaxation import hAddHeuristic, hFFHeuristic, hMaxHeuristic, hSAHeuristic
+from pyperplan.pddl.pddl import Problem
+from pyperplan.task import Operator, Task
+from typing import Any, Callable, List, Optional, Type, Union
 
 
 SEARCHES = {
@@ -41,7 +45,7 @@ SEARCHES = {
 NUMBER = re.compile(r"\d+")
 
 
-def get_heuristics():
+def get_heuristics() -> List[Any]:
     """
     Scan all python modules in the "heuristics" directory for classes ending
     with "Heuristic".
@@ -66,7 +70,7 @@ def get_heuristics():
     return heuristics
 
 
-def _get_heuristic_name(cls):
+def _get_heuristic_name(cls: Any) -> str:
     name = cls.__name__
     assert name.endswith("Heuristic")
     return name[:-9].lower()
@@ -75,11 +79,11 @@ def _get_heuristic_name(cls):
 HEURISTICS = {_get_heuristic_name(heur): heur for heur in get_heuristics()}
 
 
-def validator_available():
+def validator_available() -> bool:
     return tools.command_available(["validate", "-h"])
 
 
-def find_domain(problem):
+def find_domain(problem: str) -> str:
     """
     This function tries to guess a domain file from a given problem file.
     It first uses a file called "domain.pddl" in the same directory as
@@ -107,7 +111,7 @@ def find_domain(problem):
     return domain
 
 
-def _parse(domain_file, problem_file):
+def _parse(domain_file: str, problem_file: str) -> Problem:
     # Parsing
     parser = Parser(domain_file, problem_file)
     logging.info(f"Parsing Domain {domain_file}")
@@ -123,8 +127,8 @@ def _parse(domain_file, problem_file):
 
 
 def _ground(
-    problem, remove_statics_from_initial_state=True, remove_irrelevant_operators=True
-):
+    problem: Problem, remove_statics_from_initial_state: bool=True, remove_irrelevant_operators: bool=True
+) -> Task:
     logging.info(f"Grounding start: {problem.name}")
     task = grounding.ground(
         problem, remove_statics_from_initial_state, remove_irrelevant_operators
@@ -135,7 +139,7 @@ def _ground(
     return task
 
 
-def _search(task, search, heuristic, use_preferred_ops=False):
+def _search(task: Task, search: Callable, heuristic: Optional[Union[hAddHeuristic, hFFHeuristic, hMaxHeuristic, hSAHeuristic]], use_preferred_ops: bool=False) -> List[Operator]:
     logging.info(f"Search start: {task.name}")
     if heuristic:
         if use_preferred_ops:
@@ -148,7 +152,7 @@ def _search(task, search, heuristic, use_preferred_ops=False):
     return solution
 
 
-def write_solution(solution, filename):
+def write_solution(solution: List[Operator], filename: str):
     assert solution is not None
     with open(filename, "w") as file:
         for op in solution:
@@ -156,8 +160,8 @@ def write_solution(solution, filename):
 
 
 def search_plan(
-    domain_file, problem_file, search, heuristic_class, use_preferred_ops=False
-):
+    domain_file: str, problem_file: str, search: Callable, heuristic_class: Optional[Union[Type[hSAHeuristic], Type[hMaxHeuristic], Type[hAddHeuristic], Type[hFFHeuristic]]], use_preferred_ops: bool=False
+) -> List[Operator]:
     """
     Parses the given input files to a specific planner task and then tries to
     find a solution using the specified  search algorithm and heuristics.
@@ -185,7 +189,7 @@ def search_plan(
     return solution
 
 
-def validate_solution(domain_file, problem_file, solution_file):
+def validate_solution(domain_file: str, problem_file: str, solution_file: str):
     if not validator_available():
         logging.info(
             "validate could not be found on the PATH so the plan can "

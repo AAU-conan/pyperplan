@@ -16,6 +16,8 @@
 #
 
 from .heuristic_base import Heuristic
+from pyperplan.search.searchspace import SearchNode
+from pyperplan.task import Task
 
 
 class BlindHeuristic(Heuristic):
@@ -24,11 +26,11 @@ class BlindHeuristic(Heuristic):
     It returns 0 if the goal was reached and 1 otherwise.
     """
 
-    def __init__(self, task):
+    def __init__(self, task: Task):
         super().__init__()
         self.goals = task.goals
 
-    def __call__(self, node):
+    def __call__(self, node: SearchNode):
         if all([(fact in node.state) for fact in self.goals]):
             return 0
         else:
