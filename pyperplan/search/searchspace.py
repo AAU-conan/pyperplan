@@ -18,6 +18,8 @@
 """
 Building the search node and associated methods
 """
+from pyperplan.task import Operator
+from typing import List, Optional
 
 
 class SearchNode:
@@ -28,7 +30,7 @@ class SearchNode:
     the node and the path length in the count of applied operators.
     """
 
-    def __init__(self, state, parent, action, g):
+    def __init__(self, state: frozenset, parent: Optional[SearchNode], action: Optional[Operator], g: int):
         """
         Construct a search node
 
@@ -43,7 +45,7 @@ class SearchNode:
         self.action = action
         self.g = g
 
-    def extract_solution(self):
+    def extract_solution(self) -> List[Operator]:
         """
         Returns the list of actions that were applied from the initial node to
         the goal node.
@@ -56,7 +58,7 @@ class SearchNode:
         return solution
 
 
-def make_root_node(initial_state):
+def make_root_node(initial_state: frozenset) -> SearchNode:
     """
     Construct an initial search node. The root node of the search space
     does not links to a parent node, does not contains an action and the
@@ -67,7 +69,7 @@ def make_root_node(initial_state):
     return SearchNode(initial_state, None, None, 0)
 
 
-def make_child_node(parent_node, action, state):
+def make_child_node(parent_node: SearchNode, action: Operator, state: frozenset) -> SearchNode:
     """
     Construct a new search node containing the state and the applied action.
     The node is linked to the given parent node.

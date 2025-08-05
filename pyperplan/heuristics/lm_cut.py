@@ -23,9 +23,10 @@ from heapq import *
 import logging
 
 from .heuristic_base import Heuristic
+from typing import Callable
 
 
-def _compare(op):
+def _compare(op: str) -> Callable:
     """General compare function for objects containing hmax values."""
 
     def comp(self, x):

@@ -18,6 +18,7 @@
 """
 Classes for representing a STRIPS planning task
 """
+from typing import List, Set, Tuple
 
 
 class Operator:
@@ -28,13 +29,13 @@ class Operator:
     delete_effects are the facts that the operator makes false.
     """
 
-    def __init__(self, name, preconditions, add_effects, del_effects):
+    def __init__(self, name: str, preconditions: Set[str], add_effects: Set[str], del_effects: Set[str]):
         self.name = name
         self.preconditions = frozenset(preconditions)
         self.add_effects = frozenset(add_effects)
         self.del_effects = frozenset(del_effects)
 
-    def applicable(self, state):
+    def applicable(self, state: frozenset) -> bool:
         """
         Operators are applicable when their set of preconditions is a subset
         of the facts that are true in "state".
@@ -44,7 +45,7 @@ class Operator:
         """
         return self.preconditions <= state
 
-    def apply(self, state):
+    def apply(self, state: frozenset) -> frozenset:
         """
         Applying an operator means removing the facts that are made false
         by the operator from the set of true facts in state and adding
@@ -70,7 +71,7 @@ class Operator:
             and self.del_effects == other.del_effects
         )
 
-    def __hash__(self):
+    def __hash__(self) -> int:
         return hash((self.name, self.preconditions, self.add_effects, self.del_effects))
 
     def __str__(self):
@@ -93,7 +94,7 @@ class Task:
     A STRIPS planning task
     """
 
-    def __init__(self, name, facts, initial_state, goals, operators):
+    def __init__(self, name: str, facts: Set[str], initial_state: frozenset, goals: frozenset, operators: List[Operator]):
         """
         @param name The task's name
         @param facts A set of all the fact names that are valid in the domain
@@ -107,7 +108,7 @@ class Task:
         self.goals = goals
         self.operators = operators
 
-    def goal_reached(self, state):
+    def goal_reached(self, state: frozenset) -> bool:
         """
         The goal has been reached if all facts that are true in "goals"
         are true in "state".
@@ -116,7 +117,7 @@ class Task:
         """
         return self.goals <= state
 
-    def get_successor_states(self, state):
+    def get_successor_states(self, state: frozenset) -> List[Tuple[Operator, frozenset]]:
         """
         @return A list with (op, new_state) pairs where "op" is the applicable
         operator and "new_state" the state that results when "op" is applied

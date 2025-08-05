@@ -19,6 +19,7 @@
 This module contains all data structures needed to represent a PDDL domain and
 possibly a task definition.
 """
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 
 class Type:
@@ -26,7 +27,7 @@ class Type:
     This class represents a PDDL type.
     """
 
-    def __init__(self, name, parent):
+    def __init__(self, name: str, parent: Optional[str]):
         self.name = name.lower()
         self.parent = parent
 
@@ -38,7 +39,7 @@ class Type:
 
 
 class Predicate:
-    def __init__(self, name, signature):
+    def __init__(self, name: str, signature: List[Union[Tuple[str, Tuple[Type]], Tuple[str, Type]]]):
         """
         name: The name of the predicate.
         signature: A list of tuples (name, [types]) to represent a list of
@@ -81,7 +82,7 @@ class Effect:
 
 
 class Action:
-    def __init__(self, name, signature, precondition, effect):
+    def __init__(self, name: str, signature: List[Tuple[str, Tuple[Type]]], precondition: List[Predicate], effect: Effect):
         """
         name: The name identifying the action
         signature: A list of tuples (name, [types]) to represent a list of
@@ -97,7 +98,7 @@ class Action:
 
 
 class Domain:
-    def __init__(self, name, types, predicates, actions, constants={}):
+    def __init__(self, name: str, types: Dict[str, Type], predicates: Dict[str, Predicate], actions: Dict[str, Action], constants: Dict[Any, Any]={}):
         """
         name: The name of the domain
         types: A dict of typename->Type instances in the domain
@@ -127,7 +128,7 @@ class Domain:
 
 
 class Problem:
-    def __init__(self, name, domain, objects, init, goal):
+    def __init__(self, name: str, domain: Domain, objects: Dict[str, Type], init: List[Predicate], goal: List[Predicate]):
         """
         name: The name of the problem
         domain: The domain in which the problem has to be solved
