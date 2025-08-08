@@ -24,12 +24,18 @@ import sys
 import time
 
 from . import grounding, heuristics, search, tools
+from .heuristics.heuristic_base import Heuristic
+from .heuristics.qualified_dominance_heuristic import QualifiedDominanceHeuristic
 from .pddl.parser import Parser
 from pyperplan.heuristics.relaxation import hAddHeuristic, hFFHeuristic, hMaxHeuristic, hSAHeuristic
 from pyperplan.pddl.pddl import Problem
-from pyperplan.task import Operator, Task
+from pyperplan.task import Operator, Task, FactoredTask
 from typing import Any, Callable, List, Optional, Type, Union
 
+from .pruning.pruning import Pruning
+from .translate.sas_tasks import SASTask
+from .translate.translate import pddl_to_sas
+from .translate.pddl_parser import open as open_pddl
 
 SEARCHES = {
     "astar": search.astar_search,
@@ -77,6 +83,40 @@ def _get_heuristic_name(cls: Any) -> str:
 
 
 HEURISTICS = {_get_heuristic_name(heur): heur for heur in get_heuristics()}
+
+
+
+def get_pruning_methods() -> List[Any]:
+    """
+    Scan all python modules in the "pruning" directory for classes ending
+    with "Pruning".
+    """
+    pruning_methods = []
+    src_dir = os.path.dirname(os.path.abspath(__file__))
+    heuristics_dir = os.path.abspath(os.path.join(src_dir, "pruning"))
+    for filename in os.listdir(heuristics_dir):
+        if not filename.endswith(".py"):
+            continue
+        name = "." + os.path.splitext(os.path.basename(filename))[0]
+        module = importlib.import_module(name, package="pyperplan.pruning")
+        pruning_methods.extend(
+            [
+                getattr(module, cls)
+                for cls in dir(module)
+                if cls.endswith("Pruning")
+                   and cls != "Pruning"
+                   and not cls.startswith("_")
+            ]
+        )
+    return pruning_methods
+
+
+def _get_pruning_name(cls: Any) -> str:
+    name = cls.__name__
+    assert name.endswith("Pruning")
+    return name[:-7].lower()
+
+PRUNING = {_get_pruning_name(p): p for p in get_pruning_methods()}
 
 
 def validator_available() -> bool:
@@ -139,15 +179,15 @@ def _ground(
     return task
 
 
-def _search(task: Task, search: Callable, heuristic: Optional[Union[hAddHeuristic, hFFHeuristic, hMaxHeuristic, hSAHeuristic]], use_preferred_ops: bool=False) -> List[Operator]:
+def _search(task: Task, search: Callable, heuristic: Optional[Union[hAddHeuristic, hFFHeuristic, hMaxHeuristic, hSAHeuristic]], pruning: Pruning, use_preferred_ops: bool=False) -> List[Operator]:
     logging.info(f"Search start: {task.name}")
     if heuristic:
         if use_preferred_ops:
-            solution = search(task, heuristic, use_preferred_ops)
+            solution = search(task, heuristic, pruning, use_preferred_ops)
         else:
-            solution = search(task, heuristic)
+            solution = search(task, heuristic, pruning)
     else:
-        solution = search(task)
+        solution = search(task, pruning)
     logging.info(f"Search end: {task.name}")
     return solution
 
@@ -156,11 +196,11 @@ def write_solution(solution: List[Operator], filename: str):
     assert solution is not None
     with open(filename, "w") as file:
         for op in solution:
-            print(op.name, file=file)
+            print(op if isinstance(op, str) else op.name, file=file)
 
 
 def search_plan(
-    domain_file: str, problem_file: str, search: Callable, heuristic_class: Optional[Union[Type[hSAHeuristic], Type[hMaxHeuristic], Type[hAddHeuristic], Type[hFFHeuristic]]], use_preferred_ops: bool=False
+    domain_file: str, problem_file: str, search: Callable, heuristic_class: Optional[Type[Heuristic]], pruning_class: Type[Pruning], use_preferred_ops: bool=False, use_qualified_dominance: bool=False, task_representation: str="strips",
 ) -> List[Operator]:
     """
     Parses the given input files to a specific planner task and then tries to
@@ -175,16 +215,29 @@ def search_plan(
                             interface
     @return A list of actions that solve the problem
     """
-    problem = _parse(domain_file, problem_file)
-    task = _ground(problem)
+    if task_representation == "strips":
+        problem = _parse(domain_file, problem_file)
+        task = _ground(problem)
+    elif task_representation == "factored":
+        pddl_task = open_pddl(domain_file, problem_file)
+        sas_task: SASTask = pddl_to_sas(pddl_task)
+        task = FactoredTask.from_sas_task(pddl_task.task_name, sas_task)
+        print(task.to_dot())
+    else:
+        raise ValueError(f"Unknown task representation: {task_representation}")
+
     heuristic = None
     if not heuristic_class is None:
-        heuristic = heuristic_class(task)
+        if use_qualified_dominance:
+            heuristic = QualifiedDominanceHeuristic(task, heuristic_class)
+        else:
+            heuristic = heuristic_class(task)
+    pruning = pruning_class(task)
     search_start_time = time.process_time()
     if use_preferred_ops and isinstance(heuristic, heuristics.hFFHeuristic):
-        solution = _search(task, search, heuristic, use_preferred_ops=True)
+        solution = _search(task, search, heuristic, pruning, use_preferred_ops=True)
     else:
-        solution = _search(task, search, heuristic)
+        solution = _search(task, search, heuristic, pruning)
     logging.info("Search time: {:.2}".format(time.process_time() - search_start_time))
     return solution
 

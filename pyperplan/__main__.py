@@ -30,7 +30,7 @@ from pyperplan.planner import (
     search_plan,
     SEARCHES,
     validate_solution,
-    write_solution,
+    write_solution, PRUNING,
 )
 
 
@@ -61,11 +61,31 @@ def main():
         default="hff",
     )
     argparser.add_argument(
+        "-p",
+        "--pruning",
+        choices=PRUNING.keys(),
+        help="Select a pruning method",
+        default="none",
+    )
+    argparser.add_argument(
         "-s",
         "--search",
         choices=SEARCHES.keys(),
         help=f"Select a search algorithm from {search_names}",
         default="bfs",
+    )
+    argparser.add_argument(
+        "-t",
+        "--task-representation",
+        choices=["strips", "factored"],
+        help="Select the task representation to use",
+        default="strips",
+    )
+    argparser.add_argument(
+        "--qdom",
+        "--use-qualified-dominance",
+        action="store_true",
+        help="Use the qualified dominance heuristic (use -H <heuristic> for the base heuristic)",
     )
     args = argparser.parse_args()
 
@@ -92,6 +112,7 @@ def main():
 
     search = SEARCHES[args.search]
     heuristic = HEURISTICS[args.heuristic]
+    pruning = PRUNING[args.pruning]
 
     if args.search in ["bfs", "ids", "sat"]:
         heuristic = None
@@ -104,7 +125,10 @@ def main():
         args.problem,
         search,
         heuristic,
+        pruning,
         use_preferred_ops=use_preferred_ops,
+        use_qualified_dominance=args.qdom,
+        task_representation=args.task_representation,
     )
 
     if solution is None:

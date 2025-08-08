@@ -28,6 +28,9 @@ from pyperplan.search.searchspace import SearchNode
 from pyperplan.task import Operator, Task
 from typing import Callable, List, Tuple, Union
 
+from ..heuristics.heuristic_base import Heuristic
+from ..pruning.pruning import Pruning
+
 
 def ordered_node_astar(node: SearchNode, h: int, node_tiebreaker: int) -> Tuple[int, int, int, SearchNode]:
     """
@@ -87,7 +90,7 @@ def ordered_node_greedy_best_first(node: SearchNode, h: int, node_tiebreaker: in
     return (f, h, node_tiebreaker, node)
 
 
-def greedy_best_first_search(task: Task, heuristic: Union[hSAHeuristic, hMaxHeuristic], use_relaxed_plan: bool=False) -> List[Operator]:
+def greedy_best_first_search(task: Task, heuristic: Heuristic, use_relaxed_plan: bool=False) -> List[Operator]:
     """
     Searches for a plan in the given task using greedy best first search.
 
@@ -100,7 +103,7 @@ def greedy_best_first_search(task: Task, heuristic: Union[hSAHeuristic, hMaxHeur
     )
 
 
-def weighted_astar_search(task: Task, heuristic: hAddHeuristic, weight: int=5, use_relaxed_plan: bool=False) -> List[Operator]:
+def weighted_astar_search(task: Task, heuristic: Heuristic, weight: int=5, use_relaxed_plan: bool=False) -> List[Operator]:
     """
     Searches for a plan in the given task using A* search.
 
@@ -115,7 +118,7 @@ def weighted_astar_search(task: Task, heuristic: hAddHeuristic, weight: int=5, u
 
 
 def astar_search(
-    task: Task, heuristic: Union[hFFHeuristic, hSAHeuristic, hMaxHeuristic, hAddHeuristic], make_open_entry: Callable=ordered_node_astar, use_relaxed_plan: bool=False
+    task: Task, heuristic: Heuristic, pruning: Pruning, make_open_entry: Callable=ordered_node_astar, use_relaxed_plan: bool=False
 ) -> List[Operator]:
     """
     Searches for a plan in the given task using A* search.
@@ -141,13 +144,18 @@ def astar_search(
 
     besth = float("inf")
     counter = 0
+    generated = 1
     expansions = 0
+    highest_f = -1
 
     while open:
         (f, h, _tie, pop_node) = heapq.heappop(open)
         if h < besth:
             besth = h
             logging.debug("Found new best h: %d after %d expansions" % (besth, counter))
+        if f > highest_f:
+            highest_f = f
+            logging.debug("f: %d (%d expansions, %d generated)" % (highest_f, counter, generated))
 
         pop_state = pop_node.state
         # Only expand the node if its associated cost (g value) is the lowest
@@ -181,6 +189,10 @@ def astar_search(
                         logging.debug("keeping operator %s" % op.name)
 
                 succ_node = searchspace.make_child_node(pop_node, op, succ_state)
+
+                if pruning.prune(succ_node):
+                    continue
+
                 h = heuristic(succ_node)
                 if h == float("inf"):
                     # don't bother with states that can't reach the goal anyway
@@ -192,6 +204,7 @@ def astar_search(
                     node_tiebreaker += 1
                     heapq.heappush(open, make_open_entry(succ_node, h, node_tiebreaker))
                     state_cost[succ_state] = succ_node.g
+                    generated += 1
 
         counter += 1
     logging.info("No operators left. Task unsolvable.")

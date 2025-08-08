@@ -25,7 +25,7 @@ import itertools
 import logging
 import re
 
-from .task import Operator, Task
+from .task import Operator, Task, STRIPSTask
 from pyperplan.pddl.pddl import Action, Predicate, Problem, Type
 from pyperplan.task import Operator, Task
 from typing import DefaultDict, Dict, List, Set
@@ -110,7 +110,7 @@ def ground(
         operators = _relevance_analysis(operators, goals)
 
     name = problem.name
-    return Task(name, facts, init, goals, operators)
+    return STRIPSTask(name, facts, init, goals, operators)
 
 
 def _relevance_analysis(operators: List[Operator], goals: frozenset) -> List[Operator]:

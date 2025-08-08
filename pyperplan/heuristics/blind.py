@@ -28,10 +28,7 @@ class BlindHeuristic(Heuristic):
 
     def __init__(self, task: Task):
         super().__init__()
-        self.goals = task.goals
+        self.task = task
 
     def __call__(self, node: SearchNode):
-        if all([(fact in node.state) for fact in self.goals]):
-            return 0
-        else:
-            return 1
+        return 0 if self.task.goal_reached(node.state) else 1

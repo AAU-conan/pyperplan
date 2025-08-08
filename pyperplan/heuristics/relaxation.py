@@ -18,7 +18,7 @@
 import heapq
 import logging
 
-from ..task import Operator, Task
+from ..task import Operator, Task, STRIPSTask
 from .heuristic_base import Heuristic
 from pyperplan.search.searchspace import SearchNode
 from pyperplan.task import Task
@@ -90,7 +90,7 @@ class _RelaxationHeuristic(Heuristic):
     implementation of the hAdd heuristic.
     """
 
-    def __init__(self, task: Task):
+    def __init__(self, task: STRIPSTask):
         """Construct a instance of _RelaxationHeuristic.
 
         Keyword arguments:
