@@ -1,4 +1,6 @@
 import heapq
+import logging
+from typing import Optional
 
 from pyperplan.search.searchspace import SearchNode
 from pyperplan.task import FactoredTask, FactorState, FactoredTaskState
@@ -13,17 +15,33 @@ class SaturatedCostPartitioningHeuristic:
     label s.t. each state still has the same goal cost. We then continue with that procedure in all factors. Eventually,
     all labels should have 0-cost. To compute the heuristic value, we just sum the goal distances of each factor.
     """
-    def __init__(self, task: FactoredTask):
+    def __init__(self, task: FactoredTask, order: Optional[list[int]]=None, only_reachable_from: Optional[FactoredTaskState]=None):
         self.task = task
         self.factor_goal_costs: list[dict[FactorState, int]]
 
-        self._compute_saturated_cost_partitioning()
+        self._compute_saturated_cost_partitioning(range(self.task.size()) if order is None else order, only_reachable_from)
 
-    def _compute_saturated_cost_partitioning(self):
+    def _compute_saturated_cost_partitioning(self, order, only_reachable_from: Optional[FactoredTaskState]):
         label_costs = {label: 1 for label in self.task.labels} # We only have unit cost actions in this case
-        self.factor_goal_costs = []
+        self.factor_goal_costs = [None for _ in range(self.task.size())]
 
-        for factor in self.task.factors:
+        for i in order:
+            factor = self.task.factors[i]
+            if only_reachable_from is not None:
+                # We only ensure the goal cost is preserved from states reachable from the given state
+                reachable = {only_reachable_from.states[i]}
+                worklist = list(reachable)
+                while worklist:
+                    state = worklist.pop()
+                    for label, next_state in factor.transitions_of_state(state):
+                        if next_state not in reachable:
+                            reachable.add(next_state)
+                            worklist.append(next_state)
+
+                # logging.debug(f"{len(reachable)} reachable out of {len(factor.states)} states in factor {factor.name}")
+            else:
+                reachable = set(factor.states)
+
             goal_costs = {state: float('inf') if state not in factor.goal_states else 0 for state in factor.states}
 
             # Do dijkstra-like search to compute the goal costs
@@ -40,14 +58,15 @@ class SaturatedCostPartitioningHeuristic:
                         goal_costs[prev_state] = prev_cost
                         heapq.heappush(queue, (prev_cost, prev_state))
 
-            self.factor_goal_costs.append(goal_costs)
+            self.factor_goal_costs[i] = goal_costs
 
             # Now, for each label we compute the minimum cost it can have and still preserve the goal costs
             min_label_costs = {label: float('-inf') for label in self.task.labels}
 
             for label in self.task.labels:
                 for s, t in factor.transitions_of_label(label):
-                    min_label_costs[label] = max(min_label_costs[label], goal_costs[s] - goal_costs[t])
+                    if s in reachable:
+                        min_label_costs[label] = max(min_label_costs[label], goal_costs[s] - goal_costs[t])
 
             # Subtract the minimum cost from all labels
             label_costs = {label: cost - min_label_costs[label] for label, cost in label_costs.items()}

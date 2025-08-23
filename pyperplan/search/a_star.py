@@ -21,6 +21,7 @@ Implements the A* (a-star) and weighted A* search algorithm.
 
 import heapq
 import logging
+from pathlib import Path
 
 from . import searchspace
 from pyperplan.heuristics.relaxation import hAddHeuristic, hFFHeuristic, hMaxHeuristic, hSAHeuristic
@@ -142,6 +143,8 @@ def astar_search(
     heapq.heappush(open, make_open_entry(root, init_h, node_tiebreaker))
     logging.info("Initial h value: %f" % init_h)
 
+    heuristic_history = []
+
     besth = float("inf")
     counter = 0
     generated = 1
@@ -167,6 +170,7 @@ def astar_search(
             if task.goal_reached(pop_state):
                 logging.info("Goal reached. Start extraction of solution.")
                 logging.info("%d Nodes expanded" % expansions)
+                Path("heuristic_history.txt").open("w").write('\n'.join(','.join(str(ss) for ss in s) for s in heuristic_history))
                 return pop_node.extract_solution()
             rplan = None
             if use_relaxed_plan:
@@ -194,6 +198,8 @@ def astar_search(
                     continue
 
                 h = heuristic(succ_node)
+
+                heuristic_history.append((succ_node.g, str(succ_state), h))
                 if h == float("inf"):
                     # don't bother with states that can't reach the goal anyway
                     continue

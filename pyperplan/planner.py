@@ -222,7 +222,7 @@ def search_plan(
         pddl_task = open_pddl(domain_file, problem_file)
         sas_task: SASTask = pddl_to_sas(pddl_task)
         task = FactoredTask.from_sas_task(pddl_task.task_name, sas_task)
-        print(task.to_dot())
+        # print(task.to_dot())
     else:
         raise ValueError(f"Unknown task representation: {task_representation}")
 

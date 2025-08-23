@@ -1,8 +1,10 @@
 import copy
 import logging
+from pathlib import Path
 from typing import Type, TYPE_CHECKING
 
 from pyperplan.heuristics.heuristic_base import Heuristic
+from pyperplan.heuristics.saturated_cost_partitioning import SaturatedCostPartitioningHeuristic
 from pyperplan.pruning.dominance_pruning import DominancePruning
 from pyperplan.task import FactoredTask, LabelledTransitionSystem, FactorState, FactoredTaskState
 
@@ -70,7 +72,7 @@ class QualifiedDominanceHeuristic(Heuristic):
     it compares to.
     """
 
-    def __init__(self, task: FactoredTask, base_heuristic: Type[Heuristic]):
+    def __init__(self, task: FactoredTask, base_heuristic: Type[Heuristic], intersect_original_factor: bool = False):
         super().__init__()
         self.dominance_pruning = DominancePruning(task)
         self.heuristic: Type[Heuristic] = base_heuristic
@@ -79,6 +81,7 @@ class QualifiedDominanceHeuristic(Heuristic):
         self.qdom_factors_state_maps: list[dict[tuple[FactorState,FactorState], FactorState]] = [] # Maps from the original factor states to the states in the qualified dominance automaton
         self._compute_qualified_dominance()
         self.seen_states: list[tuple[int, FactoredTaskState]] = []
+        self.intersect_original_factor = intersect_original_factor
 
     def _compute_qualified_dominance(self):
         """
@@ -91,32 +94,48 @@ class QualifiedDominanceHeuristic(Heuristic):
         logging.debug("Computing Qualified Dominance Automata...")
         for i, factor in enumerate(self.task.factors):
             def state_name(s: FactorState, t: FactorState):
-                return f"({s.name},{t.name})"
+                return f"{s.name} < {t.name}"
             states = [state_name(s,t) for s in factor.states for t in factor.states]
+            universal_true = "TRUE"
+            states.append(universal_true)
 
-            transitions = []
-            goal_states = []
+            transitions = set((universal_true, l, universal_true) for l in self.task.labels)
+            goal_states = [universal_true]
 
             for s in factor.states:
                 for t in factor.states:
                     if s not in factor.goal_states or t in factor.goal_states:
                         goal_states.append(state_name(s, t))
 
+                    labels_not_applicable_at_s = self.task.labels.copy()
                     for l, s_prime in factor.transitions_of_state(s):
+                        labels_not_applicable_at_s.remove(l)
+                        # NOOP
+                        if self.dominance_pruning._dominates_in_all_other_factors(i, l, "noop"):
+                            transitions.add((state_name(s, t), l, state_name(s_prime, t)))
+
+                        # Actual transition
                         for l_prime, t_prime in factor.transitions_of_state(t):
                             if self.dominance_pruning._dominates_in_all_other_factors(i, l, l_prime):
-                                transitions.append((state_name(s, t), l, state_name(s_prime, t_prime)))
+                                transitions.add((state_name(s, t), l, state_name(s_prime, t_prime)))
+
+                    for l in labels_not_applicable_at_s:
+                        # Map this to a universally true state
+                        transitions.add((state_name(s,t), l, universal_true))
+
 
             lts = LabelledTransitionSystem(
                 'qdom_' + factor.name,
                 states,
-                transitions,
+                list(transitions),
                 initial_state=states[0], # Fake initial state, not used
                 goal_states=goal_states
             )
+            # Path(f"qdom_{i}.dot").open("w").write(lts.to_dot())
             self.qdom_factors_state_maps.append({p: lts.states[i] for i, p in enumerate((s,t) for s in factor.states for t in factor.states)})
             lts_comp = complement_lts(lts)
 
+            # Path(f"nqdom_{i}.dot").open("w").write(lts_comp.to_dot())
             self.qdom_factors.append(lts_comp)
             logging.debug(f"Automaton for {factor.name} has {len(lts_comp.states)} states and {len(lts_comp.transitions)} transitions.")
 
@@ -144,10 +163,16 @@ class QualifiedDominanceHeuristic(Heuristic):
 
         extended_task.factors = tuple(extended_task.factors + tuple(new_factors))
 
-        h = self.heuristic(extended_task)
+        if self.heuristic == SaturatedCostPartitioningHeuristic:
+            h = self.heuristic(extended_task,
+                               # order=range(extended_task.size())[::-1],
+                               only_reachable_from=state
+            )
+        else:
+            h = self.heuristic(extended_task)
 
         # print(f"Evaluating {state}")
-        # print(extended_task.to_dot())
+        # print(extended_task.save_dot(Path("extended_task.dot")))
 
         self.seen_states.append((node.g, node.state))
         value = h(SearchNode(state, node.parent, node.action, node.g))

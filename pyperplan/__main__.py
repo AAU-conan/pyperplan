@@ -23,6 +23,7 @@ import argparse
 import logging
 import os
 import sys
+from pathlib import Path
 
 from pyperplan.planner import (
     find_domain,
@@ -52,6 +53,11 @@ def main():
     )
     argparser.add_argument(dest="domain", nargs="?")
     argparser.add_argument(dest="problem")
+    argparser.add_argument('--plan-file',
+        type=Path,
+        help="File path for the plan",
+        default=None,
+    )
     argparser.add_argument("-l", "--loglevel", choices=log_levels, default="info")
     argparser.add_argument(
         "-H",
@@ -134,10 +140,11 @@ def main():
     if solution is None:
         logging.warning("No solution could be found")
     else:
-        solution_file = args.problem + ".soln"
         logging.info("Plan length: %s" % len(solution))
-        write_solution(solution, solution_file)
-        validate_solution(args.domain, args.problem, solution_file)
+        if args.plan_file:
+            solution_file = args.plan_file
+            write_solution(solution, solution_file)
+            validate_solution(args.domain, args.problem, solution_file)
 
 
 if __name__ == "__main__":

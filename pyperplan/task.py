@@ -19,6 +19,7 @@
 Classes for representing a STRIPS planning task
 """
 import itertools
+from pathlib import Path
 from typing import List, Set, Tuple, Any, Optional
 from abc import ABC, abstractmethod
 
@@ -288,6 +289,35 @@ class LabelledTransitionSystem:
         """
         return [target for src, label, target in self.transitions if src == s and label == l]
 
+    def to_dot(self) -> str:
+        """
+        Generate a dot representation of the labelled transition system.
+        """
+        dot_lines = []
+        dot_lines.append("digraph LTS {")
+        dot_lines.append(f'  label="{self.name}";')
+        dot_lines.append('  rankdir=LR;')
+
+        # Add states
+        for state in self.states:
+            dot_lines.append(f'  "{state.name}" [label="{state.name}"];')
+
+        # Add transitions
+        for src, label, dst in self.transitions:
+            dot_lines.append(f'  "{src.name}" -> "{dst.name}" [label="{label}"];')
+
+        # Add initial state
+        if self.initial_state:
+            dot_lines.append(f'  "Initial" [shape=point,visible=false];')
+            dot_lines.append(f'  "Initial" -> "{self.initial_state.name}";')
+
+        # Add goal states
+        for goal in self.goal_states:
+            dot_lines.append(f'  "{goal.name}" [peripheries=2];')
+
+        dot_lines.append("}")
+        return "\n".join(dot_lines)
+
 
 class FactoredTask(Task):
     """
@@ -403,3 +433,6 @@ class FactoredTask(Task):
 
         dot_lines.append("}")
         return "\n".join(dot_lines)
+
+    def save_dot(self, path: Path):
+        path.open("w").write(self.to_dot())
