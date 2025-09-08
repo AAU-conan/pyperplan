@@ -1,0 +1,32 @@
+Bootstrap: localimage
+From: apptainer/base_run.img
+
+%setup
+
+# Copy planner binary and required files from Stage 1.
+%files
+    pyperplan
+    setup.py
+    pyproject.toml
+    README.md
+
+%post
+    /venv/bin/pip install .
+
+
+%runscript
+    #! /bin/bash
+
+    if [[ "$#" -lt 3 ]]; then
+        echo "usage: DOMAIN_FILE PROBLEM_FILE PLAN_FILE"
+        exit 1
+    fi
+    source /venv/bin/activate
+
+    pyperplan "${@:4}" --plan-file "$3" "$1" "$2"
+
+   
+
+%labels
+Name        PyperplanConAn
+Authors     Rasmus Tollund <rgt@cs.aau.dk>
