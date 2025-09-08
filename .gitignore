@@ -5,3 +5,5 @@ build/
 dist/
 pyperplan.egg-info/
 .idea
+**/*.img
+*.dot
