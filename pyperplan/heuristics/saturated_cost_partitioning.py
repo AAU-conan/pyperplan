@@ -22,7 +22,7 @@ class SaturatedCostPartitioningHeuristic:
         self._compute_saturated_cost_partitioning(range(self.task.size()) if order is None else order, only_reachable_from)
 
     def _compute_saturated_cost_partitioning(self, order, only_reachable_from: Optional[FactoredTaskState]):
-        label_costs = {label: 1 for label in self.task.labels} # We only have unit cost actions in this case
+        label_costs = self.task.label_costs.copy()
         self.factor_goal_costs = [None for _ in range(self.task.size())]
 
         for i in order:

@@ -33,6 +33,7 @@ from pyperplan.planner import (
     validate_solution,
     write_solution, PRUNING,
 )
+from pyperplan.search.search_space_drawer import SearchSpaceDrawer, NoneSearchSpaceDrawer
 
 
 def main():
@@ -93,6 +94,12 @@ def main():
         action="store_true",
         help="Use the qualified dominance heuristic (use -H <heuristic> for the base heuristic)",
     )
+    argparser.add_argument(
+        "--draw-search-space",
+        choices=['none', 'graph'],
+        default='none',
+        help="Draw the search space to a file (search_space.dot)",
+    )
     args = argparser.parse_args()
 
     logging.basicConfig(
@@ -123,6 +130,15 @@ def main():
     if args.search in ["bfs", "ids", "sat"]:
         heuristic = None
 
+    if args.draw_search_space == 'none':
+        search_space_drawer = NoneSearchSpaceDrawer()
+    elif args.draw_search_space == 'graph':
+        from pyperplan.search.search_space_drawer import GraphSearchSpaceDrawer
+        search_space_drawer = GraphSearchSpaceDrawer()
+    else:
+        raise ValueError(f"Unknown search space drawer: {args.draw_search_space}")
+
+
     logging.info("using search: %s" % search.__name__)
     logging.info("using heuristic: %s" % (heuristic.__name__ if heuristic else None))
     use_preferred_ops = args.heuristic == "hffpo"
@@ -135,6 +151,7 @@ def main():
         use_preferred_ops=use_preferred_ops,
         use_qualified_dominance=args.qdom,
         task_representation=args.task_representation,
+        search_space_drawer=search_space_drawer
     )
 
     if solution is None:

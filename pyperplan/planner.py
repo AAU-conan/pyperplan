@@ -33,6 +33,7 @@ from pyperplan.task import Operator, Task, FactoredTask
 from typing import Any, Callable, List, Optional, Type, Union
 
 from .pruning.pruning import Pruning
+from .search.search_space_drawer import SearchSpaceDrawer
 from .translate.sas_tasks import SASTask
 from .translate.translate import pddl_to_sas
 from .translate.pddl_parser import open as open_pddl
@@ -179,13 +180,13 @@ def _ground(
     return task
 
 
-def _search(task: Task, search: Callable, heuristic: Optional[Union[hAddHeuristic, hFFHeuristic, hMaxHeuristic, hSAHeuristic]], pruning: Pruning, use_preferred_ops: bool=False) -> List[Operator]:
+def _search(task: Task, search: Callable, heuristic: Optional[Union[hAddHeuristic, hFFHeuristic, hMaxHeuristic, hSAHeuristic]], pruning: Pruning, search_space_drawer: SearchSpaceDrawer, use_preferred_ops: bool=False) -> List[Operator]:
     logging.info(f"Search start: {task.name}")
     if heuristic:
         if use_preferred_ops:
-            solution = search(task, heuristic, pruning, use_preferred_ops)
+            solution = search(task, heuristic, pruning, use_preferred_ops, search_space_drawer)
         else:
-            solution = search(task, heuristic, pruning)
+            solution = search(task, heuristic, pruning, search_space_drawer)
     else:
         solution = search(task, pruning)
     logging.info(f"Search end: {task.name}")
@@ -200,7 +201,7 @@ def write_solution(solution: List[Operator], filename: str):
 
 
 def search_plan(
-    domain_file: str, problem_file: str, search: Callable, heuristic_class: Optional[Type[Heuristic]], pruning_class: Type[Pruning], use_preferred_ops: bool=False, use_qualified_dominance: bool=False, task_representation: str="strips",
+    domain_file: str, problem_file: str, search: Callable, heuristic_class: Optional[Type[Heuristic]], pruning_class: Type[Pruning], search_space_drawer: SearchSpaceDrawer, use_preferred_ops: bool=False, use_qualified_dominance: bool=False, task_representation: str="strips",
 ) -> List[Operator]:
     """
     Parses the given input files to a specific planner task and then tries to
@@ -229,15 +230,15 @@ def search_plan(
     heuristic = None
     if not heuristic_class is None:
         if use_qualified_dominance:
-            heuristic = QualifiedDominanceHeuristic(task, heuristic_class)
+            heuristic = QualifiedDominanceHeuristic(task, heuristic_class, intersect_original_factor=True)
         else:
             heuristic = heuristic_class(task)
     pruning = pruning_class(task)
     search_start_time = time.process_time()
     if use_preferred_ops and isinstance(heuristic, heuristics.hFFHeuristic):
-        solution = _search(task, search, heuristic, pruning, use_preferred_ops=True)
+        solution = _search(task, search, heuristic, pruning, search_space_drawer, use_preferred_ops=True)
     else:
-        solution = _search(task, search, heuristic, pruning)
+        solution = _search(task, search, heuristic, pruning, search_space_drawer)
     logging.info("Search time: {:.2}".format(time.process_time() - search_start_time))
     return solution
 

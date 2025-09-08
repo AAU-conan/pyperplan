@@ -204,7 +204,9 @@ class FactoredTaskState:
         return len(self.states)
 
     def __str__(self):
-        return f"<{', '.join(s.name for s in self.states)}>"
+        def pretty_name(name) -> str:
+            return name.replace("NegatedAtom ", "~").replace("Atom ", "").replace("()", "")
+        return f"<{', '.join(pretty_name(s.name) for s in self.states)}>"
 
     def __repr__(self):
         return f"<{', '.join(s.name for s in self.states)}>"
@@ -302,9 +304,15 @@ class LabelledTransitionSystem:
         for state in self.states:
             dot_lines.append(f'  "{state.name}" [label="{state.name}"];')
 
-        # Add transitions
+        # Add transitions, group with same src and dst and different labels
+        aggregated_edges = {}
         for src, label, dst in self.transitions:
-            dot_lines.append(f'  "{src.name}" -> "{dst.name}" [label="{label}"];')
+            if (src, dst) not in aggregated_edges:
+                aggregated_edges[(src, dst)] = []
+            aggregated_edges[(src, dst)].append(label)
+
+        for (src, dst), labels in aggregated_edges.items():
+            dot_lines.append(f'  "{src.name}" -> "{dst.name}" [label="{"\n".join(labels)}"];')
 
         # Add initial state
         if self.initial_state:
@@ -326,9 +334,11 @@ class FactoredTask(Task):
     """
     STATE_TYPE = FactoredTaskState
 
-    def __init__(self, name: str, *factors: LabelledTransitionSystem):
+    def __init__(self, name: str, *factors: LabelledTransitionSystem, label_costs: Optional[dict[str, int]]=None):
         self.factors: tuple[LabelledTransitionSystem, ...] = factors
         self.labels = {label for factor in self.factors for _, label, _ in factor.transitions}
+        self._ordered_labels = list(sorted(self.labels))
+        self.label_costs: dict[str, int] = {label: 1 for label in self.labels} if label_costs is None else label_costs
         self.validate()
         super().__init__(name, FactoredTaskState(*[FactorState(factor.initial_state.name, factor.initial_state.value, factor.initial_state.bound) for factor in self.factors], task=self))
 
@@ -352,7 +362,7 @@ class FactoredTask(Task):
         Each factor's transitions are considered independently, and the resulting states are combined.
         """
         successors = []
-        for label in self.labels:
+        for label in self._ordered_labels:
             # Generate all combinations of successor states for each factor
             factor_successors = [factor.apply_label(state.states[i], label) for i, factor in enumerate(self.factors)]
             if all(len(fs) > 0 for fs in factor_successors):
@@ -364,6 +374,7 @@ class FactoredTask(Task):
     def from_sas_task(name: str, sas_task: SASTask):
         assert len(sas_task.axioms) == 0, "FactoredTask does not support axioms"
         factors = []
+        label_costs = {op.name: op.cost for op in sas_task.operators}
         for i, v_size in enumerate(sas_task.variables.ranges):
             states: list[str] = [sas_task.variables.value_names[i][j] for j in range(v_size)]
             transitions: list[tuple[str, str, str]] = []
@@ -400,7 +411,7 @@ class FactoredTask(Task):
 
             factors.append(LabelledTransitionSystem(f"Factor {i}", states, transitions, states[sas_task.init.values[i]], goals))
 
-        return FactoredTask(name, *factors)
+        return FactoredTask(name, *factors, label_costs=label_costs)
 
     def to_dot(self) -> str:
         """

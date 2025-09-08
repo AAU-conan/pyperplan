@@ -76,26 +76,30 @@ class QualifiedDominanceHeuristic(Heuristic):
         super().__init__()
         self.dominance_pruning = DominancePruning(task)
         self.heuristic: Type[Heuristic] = base_heuristic
+        self.intersect_original_factor = intersect_original_factor
         self.task: FactoredTask = task
         self.qdom_factors: list[LabelledTransitionSystem] = []
         self.qdom_factors_state_maps: list[dict[tuple[FactorState,FactorState], FactorState]] = [] # Maps from the original factor states to the states in the qualified dominance automaton
         self._compute_qualified_dominance()
         self.seen_states: list[tuple[int, FactoredTaskState]] = []
-        self.intersect_original_factor = intersect_original_factor
 
     def _compute_qualified_dominance(self):
         """
         Computes the qualified dominance automata for the task.
-        For each factor, compute an automaton over the states S×S where S is the set of states of the factor.
+        For each factor, compute an automaton over the states S×(S \cup ⊥) where S is the set of states of the factor.
+        The ⊥ state represents the none state, that has no transitions and is a goal state.
         Each state (s,t) is accepting iff s is not a goal or t is a goal.
-        For each state (s,t) add a transition to the state (s',t') with label l if
-            ∃ s -l-> s' and ∃ t -l'-> t' s.t. l' dominates l in all other factors
+        For each state (s,t):
+            add a transition to ⊤ (universal true) if ∄ s -l->
+            otherwise add a transition to the state (s',t') with label l if
+                ∃ s -l-> s' and ∃ t -l'-> t' s.t. l' dominates l in all other factors
+            otherwise add a transition to (s',⊥) with label l
         """
         logging.debug("Computing Qualified Dominance Automata...")
         for i, factor in enumerate(self.task.factors):
             def state_name(s: FactorState, t: FactorState):
                 return f"{s.name} < {t.name}"
-            states = [state_name(s,t) for s in factor.states for t in factor.states]
+            states = [state_name(s,t) for s in factor.states for t in factor.states] + [state_name(s, FactorState("⊥", -1, -1)) for s in factor.states]
             universal_true = "TRUE"
             states.append(universal_true)
 
@@ -103,21 +107,28 @@ class QualifiedDominanceHeuristic(Heuristic):
             goal_states = [universal_true]
 
             for s in factor.states:
-                for t in factor.states:
-                    if s not in factor.goal_states or t in factor.goal_states:
+                for t in factor.states + [FactorState("⊥", -1, -1)]:
+                    if s not in factor.goal_states or (t.name == '⊥' or t in factor.goal_states):
                         goal_states.append(state_name(s, t))
 
                     labels_not_applicable_at_s = self.task.labels.copy()
                     for l, s_prime in factor.transitions_of_state(s):
                         labels_not_applicable_at_s.remove(l)
+                        any_transition = False
                         # NOOP
-                        if self.dominance_pruning._dominates_in_all_other_factors(i, l, "noop"):
-                            transitions.add((state_name(s, t), l, state_name(s_prime, t)))
+                        if t.name != '⊥':
+                            if self.dominance_pruning._dominates_in_all_other_factors(i, l, "noop"):
+                                transitions.add((state_name(s, t), l, state_name(s_prime, t)))
+                                any_transition = True
 
-                        # Actual transition
-                        for l_prime, t_prime in factor.transitions_of_state(t):
-                            if self.dominance_pruning._dominates_in_all_other_factors(i, l, l_prime):
-                                transitions.add((state_name(s, t), l, state_name(s_prime, t_prime)))
+                            # Actual transition
+                            for l_prime, t_prime in factor.transitions_of_state(t):
+                                if self.dominance_pruning._dominates_in_all_other_factors(i, l, l_prime):
+                                    transitions.add((state_name(s, t), l, state_name(s_prime, t_prime)))
+                                    any_transition = True
+
+                        if not any_transition and self.intersect_original_factor:
+                            transitions.add((state_name(s, t), l, state_name(s_prime, FactorState("⊥", -1, -1))))
 
                     for l in labels_not_applicable_at_s:
                         # Map this to a universally true state
@@ -131,11 +142,11 @@ class QualifiedDominanceHeuristic(Heuristic):
                 initial_state=states[0], # Fake initial state, not used
                 goal_states=goal_states
             )
-            # Path(f"qdom_{i}.dot").open("w").write(lts.to_dot())
+            Path(f"qdom_{i}.dot").open("w").write(lts.to_dot())
             self.qdom_factors_state_maps.append({p: lts.states[i] for i, p in enumerate((s,t) for s in factor.states for t in factor.states)})
             lts_comp = complement_lts(lts)
 
-            # Path(f"nqdom_{i}.dot").open("w").write(lts_comp.to_dot())
+            Path(f"nqdom_{i}.dot").open("w").write(lts_comp.to_dot())
             self.qdom_factors.append(lts_comp)
             logging.debug(f"Automaton for {factor.name} has {len(lts_comp.states)} states and {len(lts_comp.transitions)} transitions.")
 

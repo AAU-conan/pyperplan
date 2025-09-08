@@ -27,8 +27,9 @@ from . import searchspace
 from pyperplan.heuristics.relaxation import hAddHeuristic, hFFHeuristic, hMaxHeuristic, hSAHeuristic
 from pyperplan.search.searchspace import SearchNode
 from pyperplan.task import Operator, Task
-from typing import Callable, List, Tuple, Union
+from typing import Callable, List, Tuple, Union, Optional
 
+from .search_space_drawer import SearchSpaceDrawer, NoneSearchSpaceDrawer
 from ..heuristics.heuristic_base import Heuristic
 from ..pruning.pruning import Pruning
 
@@ -119,7 +120,7 @@ def weighted_astar_search(task: Task, heuristic: Heuristic, weight: int=5, use_r
 
 
 def astar_search(
-    task: Task, heuristic: Heuristic, pruning: Pruning, make_open_entry: Callable=ordered_node_astar, use_relaxed_plan: bool=False
+    task: Task, heuristic: Heuristic, pruning: Pruning, search_space_drawer: SearchSpaceDrawer, make_open_entry: Callable=ordered_node_astar, use_relaxed_plan: bool=False,
 ) -> List[Operator]:
     """
     Searches for a plan in the given task using A* search.
@@ -140,6 +141,8 @@ def astar_search(
 
     root = searchspace.make_root_node(task.initial_state)
     init_h = heuristic(root)
+    search_space_drawer.set_g_value(root, root.g)
+    search_space_drawer.set_heuristic(root, init_h)
     heapq.heappush(open, make_open_entry(root, init_h, node_tiebreaker))
     logging.info("Initial h value: %f" % init_h)
 
@@ -171,6 +174,8 @@ def astar_search(
                 logging.info("Goal reached. Start extraction of solution.")
                 logging.info("%d Nodes expanded" % expansions)
                 Path("heuristic_history.txt").open("w").write('\n'.join(','.join(str(ss) for ss in s) for s in heuristic_history))
+                search_space_drawer.set_goal(pop_node)
+                search_space_drawer.draw()
                 return pop_node.extract_solution()
             rplan = None
             if use_relaxed_plan:
@@ -194,10 +199,14 @@ def astar_search(
 
                 succ_node = searchspace.make_child_node(pop_node, op, succ_state)
 
+                search_space_drawer.set_successors(pop_node, op, succ_node)
+                search_space_drawer.set_g_value(succ_node, succ_node.g)
+
                 if pruning.prune(succ_node):
                     continue
 
                 h = heuristic(succ_node)
+                search_space_drawer.set_heuristic(succ_node, h)
 
                 heuristic_history.append((succ_node.g, str(succ_state), h))
                 if h == float("inf"):
@@ -215,4 +224,5 @@ def astar_search(
         counter += 1
     logging.info("No operators left. Task unsolvable.")
     logging.info("%d Nodes expanded" % expansions)
+    search_space_drawer.draw()
     return None
