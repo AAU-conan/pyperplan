@@ -34,7 +34,7 @@ from typing import Any, Callable, List, Optional, Type, Union
 
 from .pruning.pruning import Pruning
 from .search.search_space_drawer import SearchSpaceDrawer
-from .translate.sas_tasks import SASTask
+from .translate.sas_tasks import SASTask, open_sas_task
 from .translate.translate import pddl_to_sas
 from .translate.pddl_parser import open as open_pddl
 
@@ -217,15 +217,23 @@ def search_plan(
     @return A list of actions that solve the problem
     """
     if task_representation == "strips":
+        if not domain_file or not problem_file:
+            raise ValueError("Domain and problem PDDL files must be specified for STRIPS representation")
         problem = _parse(domain_file, problem_file)
         task = _ground(problem)
     elif task_representation == "factored":
-        pddl_task = open_pddl(domain_file, problem_file)
-        sas_task: SASTask = pddl_to_sas(pddl_task)
-        task = FactoredTask.from_sas_task(pddl_task.task_name, sas_task)
+        if problem_file.endswith('.sas'):
+            sas_task: SASTask = open_sas_task(problem_file)
+            task_name = os.path.splitext(os.path.basename(problem_file))[0]
+        else:
+            pddl_task = open_pddl(domain_file, problem_file)
+            sas_task: SASTask = pddl_to_sas(pddl_task)
+            task_name = pddl_task.task_name
+        task = FactoredTask.from_sas_task(task_name, sas_task)
         # print(task.to_dot())
     else:
         raise ValueError(f"Unknown task representation: {task_representation}")
+    logging.info("done reading input!")
 
     heuristic = None
     if not heuristic_class is None:

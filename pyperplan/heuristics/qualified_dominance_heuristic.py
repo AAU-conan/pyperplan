@@ -83,6 +83,8 @@ class QualifiedDominanceHeuristic(Heuristic):
         self._compute_qualified_dominance()
         self.seen_states: list[tuple[int, FactoredTaskState]] = []
 
+        self.extended_task = copy.deepcopy(task)
+
     def _compute_qualified_dominance(self):
         """
         Computes the qualified dominance automata for the task.
@@ -95,6 +97,7 @@ class QualifiedDominanceHeuristic(Heuristic):
                 ∃ s -l-> s' and ∃ t -l'-> t' s.t. l' dominates l in all other factors
             otherwise add a transition to (s',⊥) with label l
         """
+        Path("fts.dot").open("w").write(self.task.to_dot())
         logging.debug("Computing Qualified Dominance Automata...")
         for i, factor in enumerate(self.task.factors):
             def state_name(s: FactorState, t: FactorState):
@@ -108,7 +111,7 @@ class QualifiedDominanceHeuristic(Heuristic):
 
             for s in factor.states:
                 for t in factor.states + [FactorState("⊥", -1, -1)]:
-                    if s not in factor.goal_states or (t.name == '⊥' or t in factor.goal_states):
+                    if s not in factor.goal_states or (t.name != '⊥' and t in factor.goal_states):
                         goal_states.append(state_name(s, t))
 
                     labels_not_applicable_at_s = self.task.labels.copy()
@@ -154,9 +157,9 @@ class QualifiedDominanceHeuristic(Heuristic):
         """
         Calls the base heuristic and returns the estimated cost.
         """
-        extended_task: FactoredTask = copy.deepcopy(self.task)
+        while len(self.extended_task.factors) > self.task.size():
+            self.extended_task.factors.pop(-1)
         state: FactoredTaskState = copy.deepcopy(node.state)
-        new_factors = []
         for prev_g, prev_state in self.seen_states:
             if prev_g <= node.g:
                 not_dom_factors = [i for i in range(self.task.size()) if (state.states[i], prev_state.states[i]) not in self.dominance_pruning.dominance_relations[i]]
@@ -166,21 +169,20 @@ class QualifiedDominanceHeuristic(Heuristic):
                 elif len(not_dom_factors) == 1:
                     # This state is dominated in all but one factor, add the qualified dominance automaton for that factor
                     ndf = not_dom_factors[0]
-                    new_factors.append(self.qdom_factors[ndf])
+                    self.extended_task.factors.append(self.qdom_factors[ndf])
                     state.states.append(self.qdom_factors_state_maps[ndf][(state.states[ndf], prev_state.states[ndf])])
                 else:
                     # This state is not-dominated in multiple factors, it cannot be used
                     pass
 
-        extended_task.factors = tuple(extended_task.factors + tuple(new_factors))
 
         if self.heuristic == SaturatedCostPartitioningHeuristic:
-            h = self.heuristic(extended_task,
+            h = self.heuristic(self.extended_task,
                                # order=range(extended_task.size())[::-1],
                                only_reachable_from=state
             )
         else:
-            h = self.heuristic(extended_task)
+            h = self.heuristic(self.extended_task)
 
         # print(f"Evaluating {state}")
         # print(extended_task.save_dot(Path("extended_task.dot")))

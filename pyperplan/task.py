@@ -19,6 +19,8 @@
 Classes for representing a STRIPS planning task
 """
 import itertools
+import logging
+import timeit
 from pathlib import Path
 from typing import List, Set, Tuple, Any, Optional
 from abc import ABC, abstractmethod
@@ -226,7 +228,34 @@ class LabelledTransitionSystem:
         self.transitions: list[tuple[FactorState, str, FactorState]] = [(state_name_to_factor_state[src], label, state_name_to_factor_state[dst]) for src, label, dst in transitions]
         self.goal_states: set[FactorState] = {state_name_to_factor_state[goal] for goal in goal_states}
 
-        self.state_label_to_targets = {(s,l): [t for si, li, t in self.transitions if s == si and l == li] for s, l, _ in self.transitions}
+        self.state_label_to_targets: dict[tuple[FactorState, str], list[FactorState]]
+        self.state_to_label_targets: dict[tuple[FactorState], list[tuple[str, FactorState]]]
+        self.label_to_source_targets: dict[str, list[tuple[FactorState, FactorState]]]
+        self.target_to_source_labels: dict[FactorState, list[tuple[FactorState, str]]]
+        self._compute_cached_values()
+
+    def _compute_cached_values(self):
+        self.state_label_to_targets = {}
+        self.state_to_label_targets = {}
+        self.label_to_source_targets = {}
+        self.target_to_source_labels = {}
+        for src, label, dst in self.transitions:
+            if (src, label) not in self.state_label_to_targets:
+                self.state_label_to_targets[(src, label)] = []
+            self.state_label_to_targets[(src, label)].append(dst)
+
+            if src not in self.state_to_label_targets:
+                self.state_to_label_targets[src] = []
+            self.state_to_label_targets[src].append((label, dst))
+
+            if label not in self.label_to_source_targets:
+                self.label_to_source_targets[label] = []
+            self.label_to_source_targets[label].append((src, dst))
+
+            if dst not in self.target_to_source_labels:
+                self.target_to_source_labels[dst] = []
+            self.target_to_source_labels[dst].append((src, label))
+
 
     @staticmethod
     def from_factored(name: str, states: list[FactorState], transitions: list[tuple[FactorState, str, FactorState]], initial_state: FactorState, goal_states: set[FactorState]):
@@ -238,7 +267,7 @@ class LabelledTransitionSystem:
         dummy.initial_state = initial_state
         dummy.transitions = transitions
         dummy.goal_states = goal_states
-        dummy.state_label_to_targets = {(s,l): [t for si, li, t in transitions if s == si and l == li] for s, l, _ in transitions}
+        dummy._compute_cached_values()
         return dummy
 
     def apply_label(self, state: FactorState, label: str) -> List[FactorState]:
@@ -268,28 +297,28 @@ class LabelledTransitionSystem:
         Get all transitions starting from a given state.
         Returns a list of tuples (label, target_state).
         """
-        return [(label, target) for src, label, target in self.transitions if src == s]
+        return self.state_to_label_targets.get(s, [])
 
     def transitions_to_state(self, t: FactorState) -> list[tuple[FactorState, str]]:
         """
         Get all transitions leading to a specific target state.
         Returns a list of tuples (source_state, label).
         """
-        return [(src, label) for src, label, target in self.transitions if target == t]
+        return self.target_to_source_labels.get(t, [])
 
     def transitions_of_label(self, l: str):
         """
         Get all transitions with a specific label.
         Returns a list of tuples (source_state, target_state).
         """
-        return [(src, target) for src, label, target in self.transitions if label == l]
+        return self.label_to_source_targets.get(l, [])
 
     def transitions_of_label_state(self, s: FactorState, l: str):
         """
         Get all transitions starting from a given state with a specific label.
         Returns a list of target states.
         """
-        return [target for src, label, target in self.transitions if src == s and label == l]
+        return self.state_label_to_targets.get((s, l), [])
 
     def to_dot(self) -> str:
         """
@@ -335,7 +364,7 @@ class FactoredTask(Task):
     STATE_TYPE = FactoredTaskState
 
     def __init__(self, name: str, *factors: LabelledTransitionSystem, label_costs: Optional[dict[str, int]]=None):
-        self.factors: tuple[LabelledTransitionSystem, ...] = factors
+        self.factors: list[LabelledTransitionSystem] = list(factors)
         self.labels = {label for factor in self.factors for _, label, _ in factor.transitions}
         self._ordered_labels = list(sorted(self.labels))
         self.label_costs: dict[str, int] = {label: 1 for label in self.labels} if label_costs is None else label_costs
@@ -425,17 +454,17 @@ class FactoredTask(Task):
         # Add states
         for factor in self.factors:
             for state in factor.states:
-                dot_lines.append(f'  "{state.name}" [label="{state.name}"];')
+                dot_lines.append(f'  "{state.name}" [label="{state.name}",shape={'cds' if state == factor.initial_state else 'box'}];')
 
-        # Add transitions
+        # Add transitions, group by label
         for factor in self.factors:
+            aggregated_edges = {}
             for src, label, dst in factor.transitions:
-                dot_lines.append(f'  "{src.name}" -> "{dst.name}" [label="{label}"];')
-
-        # Add initial state
-        dot_lines.append(f'  "Initial" [shape=point];')
-        for factor in self.factors:
-            dot_lines.append(f'  "Initial" -> "{factor.initial_state.name}";')
+                if (src, dst) not in aggregated_edges:
+                    aggregated_edges[(src, dst)] = []
+                aggregated_edges[(src, dst)].append(label)
+            for (src, dst), labels in aggregated_edges.items():
+                dot_lines.append(f'  "{src.name}" -> "{dst.name}" [label="{"\n".join(labels)}"];')
 
         # Add goal states
         for factor in self.factors:

@@ -104,7 +104,7 @@ def main():
 
     logging.basicConfig(
         level=getattr(logging, args.loglevel.upper()),
-        format="%(asctime)s %(levelname)-8s %(message)s",
+        format="%(relativeCreated)dms %(levelname)-8s %(message)s",
         stream=sys.stdout,
     )
 
@@ -118,7 +118,9 @@ def main():
         sys.exit(2)
 
     args.problem = os.path.abspath(args.problem)
-    if args.domain is None:
+    if args.problem.endswith('.sas'):
+        pass
+    elif args.domain is None:
         args.domain = find_domain(args.problem)
     else:
         args.domain = os.path.abspath(args.domain)

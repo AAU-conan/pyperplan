@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import List, Tuple
 
 SAS_FILE_VERSION = 3
@@ -115,6 +116,91 @@ class SASTask:
         for axiom in self.axioms:
             task_size += axiom.get_encoding_size()
         return task_size
+
+def open_sas_task(filename: str) -> SASTask:
+    """
+    Read the SAS+ task, should be in the same format as specified in the SASTask.output()
+    method.
+    """
+    with open(filename, "r") as stream:
+        assert stream.readline().strip() == "begin_version"
+        version = int(stream.readline().strip())
+        assert version == SAS_FILE_VERSION, (version, SAS_FILE_VERSION)
+        assert stream.readline().strip() == "end_version"
+        assert stream.readline().strip() == "begin_metric"
+        metric = bool(int(stream.readline().strip()))
+        assert stream.readline().strip() == "end_metric"
+        num_variables = int(stream.readline().strip())
+        ranges = []
+        axiom_layers = []
+        value_names = []
+        for _ in range(num_variables):
+            assert stream.readline().strip() == "begin_variable"
+            var_name = stream.readline().strip()
+            axiom_layer = int(stream.readline().strip())
+            var_range = int(stream.readline().strip())
+            var_value_names = [stream.readline().strip() for _ in range(var_range)]
+            assert stream.readline().strip() == "end_variable"
+            ranges.append(var_range)
+            axiom_layers.append(axiom_layer)
+            value_names.append(var_value_names)
+        variables = SASVariables(ranges, axiom_layers, value_names)
+        num_mutexes = int(stream.readline().strip())
+        mutexes = []
+        for _ in range(num_mutexes):
+            assert stream.readline().strip() == "begin_mutex_group"
+            num_facts = int(stream.readline().strip())
+            facts = []
+            for _ in range(num_facts):
+                var, val = map(int, stream.readline().strip().split())
+                facts.append((var, val))
+            assert stream.readline().strip() == "end_mutex_group"
+            mutexes.append(SASMutexGroup(facts))
+        assert len(mutexes) == num_mutexes
+        assert stream.readline().strip() == "begin_state"
+        init_values = [int(stream.readline().strip()) for _ in range(num_variables)]
+        init = SASInit(init_values)
+        assert stream.readline().strip() == "end_state"
+        assert stream.readline().strip() == "begin_goal"
+        num_goal_pairs = int(stream.readline().strip())
+        goal_pairs = [tuple(map(int, stream.readline().strip().split())) for _ in range(num_goal_pairs)]
+        goal = SASGoal(goal_pairs)
+        assert stream.readline().strip() == "end_goal"
+        num_operators = int(stream.readline().strip())
+        operators = []
+        for _ in range(num_operators):
+            assert stream.readline().strip() == "begin_operator"
+            name = "<%s>" % stream.readline().strip()
+            num_prevail = int(stream.readline().strip())
+            prevail = [tuple(map(int, stream.readline().strip().split())) for _ in range(num_prevail)]
+            num_pre_post = int(stream.readline().strip())
+            pre_post = []
+            for _ in range(num_pre_post):
+                parts = list(map(int, stream.readline().strip().split()))
+                num_cond = parts[0]
+                cond = [tuple(parts[1 + 2 * i:3 + 2 * i]) for i in range(num_cond)]
+                var, pre, post = parts[1 + 2 * num_cond:4 + 2 * num_cond]
+                pre_post.append((var, pre, post, cond))
+            cost = int(stream.readline().strip())
+            assert stream.readline().strip() == "end_operator"
+            operators.append(SASOperator(name, prevail, pre_post, cost))
+        assert len(operators) == num_operators
+        num_axioms = int(stream.readline().strip())
+        axioms = []
+        for _ in range(num_axioms):
+            assert stream.readline().strip() == "begin_rule"
+            num_cond = int(stream.readline().strip())
+            condition = [tuple(map(int, stream.readline().strip().split())) for _ in range(num_cond)]
+            var, old_value, new_value = map(int, stream.readline().strip().split())
+            assert new_value in (0, 1), new_value
+            assert stream.readline().strip() == "end_rule"
+            axioms.append(SASAxiom(condition, (var, new_value)))
+        assert len(axioms) == num_axioms
+
+        task = SASTask(variables, mutexes, init, goal, operators, axioms, metric)
+        if DEBUG:
+            task.validate()
+        return task
 
 
 class SASVariables:
