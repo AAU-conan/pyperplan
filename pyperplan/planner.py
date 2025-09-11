@@ -234,6 +234,7 @@ def search_plan(
     else:
         raise ValueError(f"Unknown task representation: {task_representation}")
     logging.info("done reading input!")
+    total_start_time = time.process_time()
 
     heuristic = None
     if not heuristic_class is None:
@@ -247,7 +248,10 @@ def search_plan(
         solution = _search(task, search, heuristic, pruning, search_space_drawer, use_preferred_ops=True)
     else:
         solution = _search(task, search, heuristic, pruning, search_space_drawer)
-    logging.info("Search time: {:.2}".format(time.process_time() - search_start_time))
+    cost = sum(task.get_action_cost(a) for a in solution)
+    logging.info(f"Plan cost: {cost}")
+    logging.info("Search time: {:.03}s".format(time.process_time() - search_start_time))
+    logging.info("Total time: {:.03}s".format(time.process_time() - total_start_time))
     return solution
 
 

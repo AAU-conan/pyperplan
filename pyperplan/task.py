@@ -111,6 +111,9 @@ class Task(ABC):
     def get_successor_states(self, state: STATE_TYPE) -> List[Tuple[Operator, STATE_TYPE]]:
         pass
 
+    def get_action_cost(self, label: str) -> int:
+        return 1
+
 
 class STRIPSTask(Task):
     """
@@ -377,6 +380,9 @@ class FactoredTask(Task):
     def validate(self):
         for factor in self.factors:
             factor.validate()
+
+    def get_action_cost(self, label: str) -> int:
+        return self.label_costs.get(label, 1)
 
     def goal_reached(self, state: FactoredTaskState) -> bool:
         """
