@@ -100,6 +100,7 @@ def main():
         default='none',
         help="Draw the search space to a file (search_space.dot)",
     )
+    argparser.add_argument("--intersect-original-factor", action="store_true")
     args = argparser.parse_args()
 
     logging.basicConfig(
@@ -144,6 +145,9 @@ def main():
     logging.info("using search: %s" % search.__name__)
     logging.info("using heuristic: %s" % (heuristic.__name__ if heuristic else None))
     use_preferred_ops = args.heuristic == "hffpo"
+    delattr(args, 'search')
+    delattr(args, 'heuristic')
+    delattr(args, 'pruning')
     solution = search_plan(
         args.domain,
         args.problem,
@@ -151,9 +155,8 @@ def main():
         heuristic,
         pruning,
         use_preferred_ops=use_preferred_ops,
-        use_qualified_dominance=args.qdom,
-        task_representation=args.task_representation,
-        search_space_drawer=search_space_drawer
+        search_space_drawer=search_space_drawer,
+        **args.__dict__
     )
 
     if solution is None:

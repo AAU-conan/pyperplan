@@ -157,8 +157,7 @@ class QualifiedDominanceHeuristic(Heuristic):
         """
         Calls the base heuristic and returns the estimated cost.
         """
-        while len(self.extended_task.factors) > self.task.size():
-            self.extended_task.factors.pop(-1)
+        self.extended_task.factors = self.task.factors.copy()
         state: FactoredTaskState = copy.deepcopy(node.state)
         for prev_g, prev_state in self.seen_states:
             if prev_g <= node.g:
@@ -174,7 +173,6 @@ class QualifiedDominanceHeuristic(Heuristic):
                 else:
                     # This state is not-dominated in multiple factors, it cannot be used
                     pass
-
 
         if self.heuristic == SaturatedCostPartitioningHeuristic:
             h = self.heuristic(self.extended_task,

@@ -201,7 +201,7 @@ def write_solution(solution: List[Operator], filename: str):
 
 
 def search_plan(
-    domain_file: str, problem_file: str, search: Callable, heuristic_class: Optional[Type[Heuristic]], pruning_class: Type[Pruning], search_space_drawer: SearchSpaceDrawer, use_preferred_ops: bool=False, use_qualified_dominance: bool=False, task_representation: str="strips",
+    domain_file: str, problem_file: str, search: Callable, heuristic_class: Optional[Type[Heuristic]], pruning_class: Type[Pruning], search_space_drawer: SearchSpaceDrawer, use_preferred_ops: bool=False, qdom: bool=False, task_representation: str= "strips", **kwargs
 ) -> List[Operator]:
     """
     Parses the given input files to a specific planner task and then tries to
@@ -237,8 +237,8 @@ def search_plan(
 
     heuristic = None
     if not heuristic_class is None:
-        if use_qualified_dominance:
-            heuristic = QualifiedDominanceHeuristic(task, heuristic_class, intersect_original_factor=True)
+        if qdom:
+            heuristic = QualifiedDominanceHeuristic(task, heuristic_class, intersect_original_factor=kwargs.get('intersect_original_factor', False))
         else:
             heuristic = heuristic_class(task)
     pruning = pruning_class(task)
