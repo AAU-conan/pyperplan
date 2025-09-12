@@ -146,12 +146,14 @@ def astar_search(
     heapq.heappush(open, make_open_entry(root, init_h, node_tiebreaker))
     logging.info("Initial h value: %f" % init_h)
 
-    heuristic_history = []
 
     besth = float("inf")
     counter = 0
     generated = 1
     expansions = 0
+    evaluated = 1
+    dead_ends = 0
+    expansions_until_last_jump = 0
     highest_f = -1
 
     while open:
@@ -161,6 +163,7 @@ def astar_search(
             logging.debug("Found new best h: %d after %d expansions" % (besth, counter))
         if f > highest_f:
             highest_f = f
+            expansions_until_last_jump = expansions
             logging.debug("f: %d (%d expansions, %d generated)" % (highest_f, counter, generated))
 
         pop_state = pop_node.state
@@ -173,7 +176,11 @@ def astar_search(
             if task.goal_reached(pop_state):
                 logging.info("Goal reached. Start extraction of solution.")
                 logging.info("%d Nodes expanded" % expansions)
-                Path("heuristic_history.txt").open("w").write('\n'.join(','.join(str(ss) for ss in s) for s in heuristic_history))
+                logging.info(f'Evaluated {evaluated} state(s).')
+                logging.info(f'Expanded {expansions} state(s).')
+                logging.info(f'Expanded until last jump: {expansions_until_last_jump} state(s).')
+                logging.info(f'Dead ends: {dead_ends} state(s).')
+                logging.info(f'Generated {generated} state(s).')
                 search_space_drawer.set_goal(pop_node)
                 search_space_drawer.draw()
                 return pop_node.extract_solution()
@@ -206,11 +213,12 @@ def astar_search(
                     continue
 
                 h = heuristic(succ_node)
+                evaluated += 1
                 search_space_drawer.set_heuristic(succ_node, h)
 
-                heuristic_history.append((succ_node.g, str(succ_state), h))
                 if h == float("inf"):
                     # don't bother with states that can't reach the goal anyway
+                    dead_ends += 1
                     continue
                 old_succ_g = state_cost.get(succ_state, float("inf"))
                 if succ_node.g < old_succ_g:
@@ -224,5 +232,11 @@ def astar_search(
         counter += 1
     logging.info("No operators left. Task unsolvable.")
     logging.info("%d Nodes expanded" % expansions)
+    logging.info(f'Evaluated {evaluated} state(s).')
+    logging.info(f'Expanded {expansions} state(s).')
+    logging.info(f'Expanded until last jump: {expansions_until_last_jump} state(s).')
+    logging.info(f'Dead ends: {dead_ends} state(s).')
+    logging.info(f'Generated {generated} state(s).')
+
     search_space_drawer.draw()
     return None

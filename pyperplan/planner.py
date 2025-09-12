@@ -264,7 +264,7 @@ def validate_solution(domain_file: str, problem_file: str, solution_file: str):
         return
 
     cmd = ["validate", domain_file, problem_file, solution_file]
-    exitcode = subprocess.call(cmd, stdout=subprocess.PIPE)
+    exitcode = subprocess.call(cmd)
 
     if exitcode == 0:
         logging.info("Plan correct")

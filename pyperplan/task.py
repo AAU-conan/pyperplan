@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import List, Set, Tuple, Any, Optional
 from abc import ABC, abstractmethod
 
+from pyperplan.string_compactification import StringCompactifier
 from pyperplan.translate.sas_tasks import SASTask
 
 
@@ -332,6 +333,8 @@ class LabelledTransitionSystem:
         dot_lines.append(f'  label="{self.name}";')
         dot_lines.append('  rankdir=LR;')
 
+        label_string_compactifier = StringCompactifier({l[1:-1] for _, l, _ in self.transitions})
+
         # Add states
         for state in self.states:
             dot_lines.append(f'  "{state.name}" [label="{state.name}"];')
@@ -344,7 +347,8 @@ class LabelledTransitionSystem:
             aggregated_edges[(src, dst)].append(label)
 
         for (src, dst), labels in aggregated_edges.items():
-            dot_lines.append(f'  "{src.name}" -> "{dst.name}" [label="{"\n".join(labels)}"];')
+            compact_labels = label_string_compactifier.compactify({l[1:-1] for l in labels})
+            dot_lines.append(f'  "{src.name}" -> "{dst.name}" [label="{"\n".join(compact_labels)}"];')
 
         # Add initial state
         if self.initial_state:
