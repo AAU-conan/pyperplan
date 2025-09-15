@@ -90,9 +90,13 @@ def main():
     )
     argparser.add_argument(
         "--qdom",
-        "--use-qualified-dominance",
-        action="store_true",
+        "--qualified-dominance",
+        choices=["none", "qdom", "iqdom"],
+        default="none",
         help="Use the qualified dominance heuristic (use -H <heuristic> for the base heuristic)",
+    )
+    argparser.add_argument("--qdom-approx", action="store_true",
+        help="Approximate qualified dominance so that it is deterministic",
     )
     argparser.add_argument(
         "--draw-search-space",

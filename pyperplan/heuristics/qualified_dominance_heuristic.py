@@ -25,6 +25,7 @@ def determinize_lts(lts: LabelledTransitionSystem) -> LabelledTransitionSystem:
 
     while worklist:
         current_set = worklist.pop()
+        # logging.debug(f'states {len(state_set_to_factored_state)}, worklist {len(worklist)}')
 
         for label in labels:
             # Compute the target set state by taking the union of all target states

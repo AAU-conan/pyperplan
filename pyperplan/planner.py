@@ -25,6 +25,7 @@ import time
 
 from . import grounding, heuristics, search, tools
 from .heuristics.heuristic_base import Heuristic
+from .heuristics.interdimensional_qualified_dominance import InterdimensionalQualifiedDominance
 from .heuristics.qualified_dominance_heuristic import QualifiedDominanceHeuristic
 from .pddl.parser import Parser
 from pyperplan.heuristics.relaxation import hAddHeuristic, hFFHeuristic, hMaxHeuristic, hSAHeuristic
@@ -94,8 +95,8 @@ def get_pruning_methods() -> List[Any]:
     """
     pruning_methods = []
     src_dir = os.path.dirname(os.path.abspath(__file__))
-    heuristics_dir = os.path.abspath(os.path.join(src_dir, "pruning"))
-    for filename in os.listdir(heuristics_dir):
+    pruning_dir = os.path.abspath(os.path.join(src_dir, "pruning"))
+    for filename in os.listdir(pruning_dir):
         if not filename.endswith(".py"):
             continue
         name = "." + os.path.splitext(os.path.basename(filename))[0]
@@ -238,18 +239,22 @@ def search_plan(
 
     heuristic = None
     if not heuristic_class is None:
-        if qdom:
-            heuristic = QualifiedDominanceHeuristic(task, heuristic_class, intersect_original_factor=kwargs.get('intersect_original_factor', False))
-        else:
+        if qdom == 'none':
             heuristic = heuristic_class(task)
+        elif qdom == 'qdom':
+            heuristic = QualifiedDominanceHeuristic(task, heuristic_class, intersect_original_factor=kwargs.get('intersect_original_factor', False))
+        elif qdom == 'iqdom':
+            heuristic = InterdimensionalQualifiedDominance(task, heuristic_class, approximate_to_deterministic=kwargs.get('qdom_approx', False))
+        else:
+            assert False, f"Unknown qdom option: {qdom}"
     pruning = pruning_class(task)
     search_start_time = time.process_time()
     if use_preferred_ops and isinstance(heuristic, heuristics.hFFHeuristic):
         solution = _search(task, search, heuristic, pruning, search_space_drawer, use_preferred_ops=True)
     else:
         solution = _search(task, search, heuristic, pruning, search_space_drawer)
-    cost = sum(task.get_action_cost(a) for a in solution)
-    logging.info(f"Plan cost: {cost}")
+    cost = sum(task.get_action_cost(a) for a in solution) if solution else -1
+    logging.info(f"Plan cost: {cost if cost >= 0 else '∞'}")
     logging.info("Search time: {:.03}s".format(time.process_time() - search_start_time))
     logging.info("Total time: {:.03}s".format(time.process_time() - total_start_time))
     return solution

@@ -167,10 +167,12 @@ class STRIPSTask(Task):
         string = "<Task {0}, vars: {1}, operators: {2}>"
         return string.format(self.name, len(self.facts), len(self.operators))
 
+def pretty_name(name: str) -> str:
+    return name.replace("NegatedAtom ", "~").replace("Atom ", "").replace("()", "")
 
 class FactorState:
     def __init__(self, name: str, value: int, bound: int):
-        self.name = name
+        self.name = pretty_name(name)
         self.value = value
         self.bound = bound  # Maximum value this factor can take
 
@@ -178,7 +180,7 @@ class FactorState:
         assert self.value < self.bound, f"Value {self.value} of factor {self.name} must be less than its bound {self.bound}"
 
     def __str__(self):
-        return f"{self.name}={self.value}"
+        return f"{self.name}"
 
     def __repr__(self):
         return f"{self.name}={self.value}"
@@ -210,8 +212,7 @@ class FactoredTaskState:
         return len(self.states)
 
     def __str__(self):
-        def pretty_name(name) -> str:
-            return name.replace("NegatedAtom ", "~").replace("Atom ", "").replace("()", "")
+
         return f"<{', '.join(pretty_name(s.name) for s in self.states)}>"
 
     def __repr__(self):
@@ -337,7 +338,7 @@ class LabelledTransitionSystem:
 
         # Add states
         for state in self.states:
-            dot_lines.append(f'  "{state.name}" [label="{state.name}"];')
+            dot_lines.append(f'  "{state.name}" [label="{state.name}",peripheries="{2 if state in self.goal_states else 1}",shape="{'cds' if state == self.initial_state else 'ellipse'}"];')
 
         # Add transitions, group with same src and dst and different labels
         aggregated_edges = {}
@@ -350,17 +351,41 @@ class LabelledTransitionSystem:
             compact_labels = label_string_compactifier.compactify({l[1:-1] for l in labels})
             dot_lines.append(f'  "{src.name}" -> "{dst.name}" [label="{"\n".join(compact_labels)}"];')
 
-        # Add initial state
-        if self.initial_state:
-            dot_lines.append(f'  "Initial" [shape=point,visible=false];')
-            dot_lines.append(f'  "Initial" -> "{self.initial_state.name}";')
-
-        # Add goal states
-        for goal in self.goal_states:
-            dot_lines.append(f'  "{goal.name}" [peripheries=2];')
-
         dot_lines.append("}")
         return "\n".join(dot_lines)
+
+    def remove_deadends_and_unreachable(self):
+        """
+        Remove dead-end states that cannot reach a goal state and states unreachable from the initial state.
+        """
+        assert self.initial_state is not None, "Initial state must be defined"
+        # Find all states that can reach a goal state using reverse graph search
+        reachable_from_goal = {s for s in self.states if s in self.goal_states}
+        worklist = list(reachable_from_goal)
+        while worklist:
+            state = worklist.pop()
+            for src, _ in self.target_to_source_labels.get(state, []):
+                if src not in reachable_from_goal:
+                    reachable_from_goal.add(src)
+                    worklist.append(src)
+
+        # Find all states reachable from the initial state using forward graph search
+        assert self.initial_state in reachable_from_goal
+        reachable_from_init_and_goal = {self.initial_state}
+        worklist = [self.initial_state]
+        while worklist:
+            state = worklist.pop()
+            for _, tgt in self.state_to_label_targets.get(state, []):
+                if tgt not in reachable_from_init_and_goal and tgt in reachable_from_goal:
+                    reachable_from_init_and_goal.add(tgt)
+                    worklist.append(tgt)
+
+        # Keep only states that are both reachable from the initial state and can reach a goal state
+        self.states = list(reachable_from_init_and_goal)
+        self.transitions = [(s, l, t) for s, l, t in self.transitions if s in reachable_from_init_and_goal and t in reachable_from_init_and_goal]
+        self.goal_states = {s for s in self.goal_states if s in reachable_from_init_and_goal}
+
+        self._compute_cached_values()
 
 
 class FactoredTask(Task):
@@ -454,35 +479,18 @@ class FactoredTask(Task):
 
     def to_dot(self) -> str:
         """
-        Generate a DOT representation of the factored task.
+        Generate a DOT representation of the factored task. Use the dot of each factor.
         """
-        dot_lines = []
-        dot_lines.append("digraph FactoredTask {")
-        dot_lines.append(f'  label="{self.name}";')
-        dot_lines.append('  rankdir=LR;')
-
-        # Add states
+        res = "digraph FactoredTask {\n"
         for factor in self.factors:
-            for state in factor.states:
-                dot_lines.append(f'  "{state.name}" [label="{state.name}",shape={'cds' if state == factor.initial_state else 'box'}];')
-
-        # Add transitions, group by label
-        for factor in self.factors:
-            aggregated_edges = {}
-            for src, label, dst in factor.transitions:
-                if (src, dst) not in aggregated_edges:
-                    aggregated_edges[(src, dst)] = []
-                aggregated_edges[(src, dst)].append(label)
-            for (src, dst), labels in aggregated_edges.items():
-                dot_lines.append(f'  "{src.name}" -> "{dst.name}" [label="{"\n".join(labels)}"];')
-
-        # Add goal states
-        for factor in self.factors:
-            for goal in factor.goal_states:
-                dot_lines.append(f'  "{goal.name}" [peripheries=2];')
-
-        dot_lines.append("}")
-        return "\n".join(dot_lines)
+            factor_dotlines = factor.to_dot().splitlines()[1:-1]  # Remove the first and last line (digraph ... { and })
+            # Make subgraph for each factor
+            res += f'  subgraph cluster_{factor.name.replace(" ", "_")} {{\n'
+            for line in factor_dotlines:
+                res += f'    {line}\n'
+            res += '  }\n'
+        res += "}\n"
+        return res
 
     def save_dot(self, path: Path):
         path.open("w").write(self.to_dot())
