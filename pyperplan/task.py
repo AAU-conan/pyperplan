@@ -224,6 +224,9 @@ class FactoredTaskState:
     def __eq__(self, other):
         return all(s1.value == s2.value for s1, s2 in zip(self.states, other.states))
 
+    def copy(self):
+        return FactoredTaskState(*self.states, task=self.task)
+
 class LabelledTransitionSystem:
     def __init__(self, name: str, states: list[str], transitions: list[Tuple[str, str, str]], initial_state: str, goal_states: list[str]):
         self.name = name

@@ -35,6 +35,14 @@ from pyperplan.planner import (
 )
 from pyperplan.search.search_space_drawer import SearchSpaceDrawer, NoneSearchSpaceDrawer
 
+def no_traceback_memoryerror(exc_type, exc_value, exc_tb):
+    if exc_type is MemoryError:
+        print("Memory limit reached.")
+    else:
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+sys.excepthook = no_traceback_memoryerror
+
 
 def main():
     # Commandline parsing

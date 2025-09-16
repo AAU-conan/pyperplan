@@ -259,7 +259,7 @@ class QualifiedDominanceHeuristic(Heuristic):
         Calls the base heuristic and returns the estimated cost.
         """
         self.extended_task.factors = self.task.factors.copy()
-        state: FactoredTaskState = copy.deepcopy(node.state)
+        state: FactoredTaskState = node.state.copy()
         for prev_state, ndf in self.comparison_strategy.get_compare_states(node):
             if ndf == -1:
                 return float('inf')
@@ -278,7 +278,6 @@ class QualifiedDominanceHeuristic(Heuristic):
         # print(f"Evaluating {state}")
         # print(extended_task.save_dot(Path("extended_task.dot")))
 
-        self.seen_states.append((node.g, node.state))
         value = h(SearchNode(state, node.parent, node.action, node.g))
         # print(f"h={value}")
         return value

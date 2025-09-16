@@ -179,7 +179,7 @@ class InterdimensionalQualifiedDominance:
         Calls the base heuristic and returns the estimated cost.
         """
         self.extended_task.factors = self.task.factors.copy()
-        state: FactoredTaskState = copy.deepcopy(node.state)
+        state: FactoredTaskState = node.state.copy()
         # logging.debug(f"Evaluating state {state} (g={node.g})")
 
         for prev_state, ndf in self.comparison_strategy.get_compare_states(node):
