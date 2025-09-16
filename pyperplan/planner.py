@@ -242,9 +242,16 @@ def search_plan(
         if qdom == 'none':
             heuristic = heuristic_class(task)
         elif qdom == 'qdom':
-            heuristic = QualifiedDominanceHeuristic(task, heuristic_class, intersect_original_factor=kwargs.get('intersect_original_factor', False))
+            heuristic = QualifiedDominanceHeuristic(task, heuristic_class,
+                            intersect_original_factor=kwargs.get('intersect_original_factor', False),
+                            approximate_to_deterministic=kwargs.get('qdom_approx', False),
+                            comparison_strategy=kwargs.get('qdom_compare')
+            )
         elif qdom == 'iqdom':
-            heuristic = InterdimensionalQualifiedDominance(task, heuristic_class, approximate_to_deterministic=kwargs.get('qdom_approx', False))
+            heuristic = InterdimensionalQualifiedDominance(task, heuristic_class,
+                            approximate_to_deterministic=kwargs.get('qdom_approx', False),
+                           comparison_strategy=kwargs.get('qdom_compare')
+           )
         else:
             assert False, f"Unknown qdom option: {qdom}"
     pruning = pruning_class(task)

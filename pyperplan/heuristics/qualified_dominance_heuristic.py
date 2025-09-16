@@ -1,7 +1,8 @@
 import copy
 import logging
+from functools import cmp_to_key
 from pathlib import Path
-from typing import Type, TYPE_CHECKING
+from typing import Type, TYPE_CHECKING, Generator
 
 from pyperplan.heuristics.heuristic_base import Heuristic
 from pyperplan.heuristics.saturated_cost_partitioning import SaturatedCostPartitioningHeuristic
@@ -64,6 +65,59 @@ def complement_lts(lts: LabelledTransitionSystem) -> LabelledTransitionSystem:
     return det_lts
 
 
+class ComparisonStrategy:
+    """
+    Interface for comparison strategies used in the qualified dominance heuristic. This decides which states to try
+    to compare the current state to.
+    """
+    def __init__(self, qdom: 'QualifiedDominanceHeuristic'):
+        self.qdom = qdom
+
+    def compare_factor(self, node: SearchNode, previous_g: int, previous_state: FactoredTaskState) -> int | None:
+        """
+        Returns the factor index that can be used for qualified dominance comparison, -1 if all are dominated, i if 
+        only factor i is not dominated, or None if no qualified dominance comparison is possible.
+        """
+        if previous_g <= node.g:
+            not_dom_factors = [i for i in range(self.qdom.task.size()) if (node.state.states[i], previous_state.states[i]) not in self.qdom.dominance_pruning.dominance_relations[i]]
+            if len(not_dom_factors) == 0:
+                return -1
+            elif len(not_dom_factors) == 1:
+                return not_dom_factors[0]
+        return None
+
+    def get_compare_states(self, node: SearchNode) -> Generator[tuple[FactoredTaskState, int], None, None]:
+        """
+        Yields (state, not-dominated-factor) to compare the current node to.
+        """
+        raise NotImplementedError()
+
+
+class AllComparisonStrategy(ComparisonStrategy):
+    """
+    A comparison strategy that compares the current state to all previously seen states.
+    """
+    def __init__(self, qdom: 'QualifiedDominanceHeuristic'):
+        super().__init__(qdom)
+        self.seen_states: list[tuple[int, FactoredTaskState]] = []
+
+    def get_compare_states(self, node: SearchNode) -> Generator[tuple[FactoredTaskState, int], None, None]:
+        for previous_g, previous_state in self.seen_states:
+            ndf = self.compare_factor(node, previous_g, previous_state)
+            if ndf is not None:
+                yield previous_state, ndf
+        self.seen_states.append((node.g, node.state))
+
+
+class ParentComparisonStrategy(ComparisonStrategy):
+    """
+    A comparison strategy that only compares the current state to its parent state.
+    """
+    def get_compare_states(self, node: SearchNode) -> Generator[tuple[FactoredTaskState, int], None, None]:
+        if node.parent is not None:
+            ndf = self.compare_factor(node, node.parent.g, node.parent.state)
+            if ndf is not None:
+                yield node.parent.state, ndf
 
 class QualifiedDominanceHeuristic(Heuristic):
     """
@@ -72,8 +126,9 @@ class QualifiedDominanceHeuristic(Heuristic):
     search, it creates a new planning task with added qualified dominance automaton as factors for each previous state that
     it compares to.
     """
+    _AUTOMATA_TR = tuple[tuple[FactorState, FactorState], str, tuple[FactorState, FactorState]]
 
-    def __init__(self, task: FactoredTask, base_heuristic: Type[Heuristic], intersect_original_factor: bool = False):
+    def __init__(self, task: FactoredTask, base_heuristic: Type[Heuristic], intersect_original_factor: bool = False, approximate_to_deterministic: bool = False, comparison_strategy: type[ComparisonStrategy] = AllComparisonStrategy):
         super().__init__()
         self.dominance_pruning = DominancePruning(task)
         self.heuristic: Type[Heuristic] = base_heuristic
@@ -81,9 +136,12 @@ class QualifiedDominanceHeuristic(Heuristic):
         self.task: FactoredTask = task
         self.qdom_factors: list[LabelledTransitionSystem] = []
         self.qdom_factors_state_maps: list[dict[tuple[FactorState,FactorState], FactorState]] = [] # Maps from the original factor states to the states in the qualified dominance automaton
-        self._compute_qualified_dominance()
-        self.seen_states: list[tuple[int, FactoredTaskState]] = []
+        self.approximate_to_deterministic = approximate_to_deterministic
 
+
+        self._compute_qualified_dominance()
+
+        self.comparison_strategy = comparison_strategy(self)
         self.extended_task = copy.deepcopy(task)
 
     def _compute_qualified_dominance(self):
@@ -98,13 +156,16 @@ class QualifiedDominanceHeuristic(Heuristic):
                 ∃ s -l-> s' and ∃ t -l'-> t' s.t. l' dominates l in all other factors
             otherwise add a transition to (s',⊥) with label l
         """
-        Path("fts.dot").open("w").write(self.task.to_dot())
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            Path("fts.dot").open("w").write(self.task.to_dot())
         logging.debug("Computing Qualified Dominance Automata...")
         for i, factor in enumerate(self.task.factors):
-            def state_name(s: FactorState, t: FactorState):
-                return f"{s.name} < {t.name}"
-            states = [state_name(s,t) for s in factor.states for t in factor.states] + [state_name(s, FactorState("⊥", -1, -1)) for s in factor.states]
             universal_true = "TRUE"
+            def state_name(s: FactorState, t: FactorState):
+                if (s,t) in self.dominance_pruning.dominance_relations[i]:
+                    return universal_true
+                return f"{s.name} < {t.name}"
+            states = [state_name(s,t) for s in factor.states for t in factor.states if (s,t) not in self.dominance_pruning.dominance_relations[i]] + [state_name(s, FactorState("⊥", -1, -1)) for s in factor.states]
             states.append(universal_true)
 
             transitions = set((universal_true, l, universal_true) for l in self.task.labels)
@@ -119,20 +180,24 @@ class QualifiedDominanceHeuristic(Heuristic):
                     for l, s_prime in factor.transitions_of_state(s):
                         labels_not_applicable_at_s.remove(l)
                         any_transition = False
+                        candidate_transitions: list[tuple[tuple[FactorState, FactorState], str, tuple[FactorState, FactorState]]] = []
                         # NOOP
                         if t.name != '⊥':
                             if self.dominance_pruning._dominates_in_all_other_factors(i, l, "noop"):
-                                transitions.add((state_name(s, t), l, state_name(s_prime, t)))
+                                candidate_transitions.append(((s, t), l, (s_prime, t)))
                                 any_transition = True
 
                             # Actual transition
                             for l_prime, t_prime in factor.transitions_of_state(t):
                                 if self.dominance_pruning._dominates_in_all_other_factors(i, l, l_prime):
-                                    transitions.add((state_name(s, t), l, state_name(s_prime, t_prime)))
+                                    candidate_transitions.append(((s, t), l, (s_prime, t_prime)))
                                     any_transition = True
 
                         if not any_transition and self.intersect_original_factor:
-                            transitions.add((state_name(s, t), l, state_name(s_prime, FactorState("⊥", -1, -1))))
+                            candidate_transitions.append(((s, t), l, (s_prime, FactorState("⊥", -1, -1))))
+
+                        for (s,t), l, (s_prime, t_prime) in self._select_transitions(candidate_transitions, i):
+                            transitions.add((state_name(s,t), l, state_name(s_prime, t_prime)))
 
                     for l in labels_not_applicable_at_s:
                         # Map this to a universally true state
@@ -146,13 +211,48 @@ class QualifiedDominanceHeuristic(Heuristic):
                 initial_state=states[0], # Fake initial state, not used
                 goal_states=goal_states
             )
-            Path(f"qdom_{i}.dot").open("w").write(lts.to_dot())
-            self.qdom_factors_state_maps.append({p: lts.states[i] for i, p in enumerate((s,t) for s in factor.states for t in factor.states)})
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                Path(f"qdom_{i}.dot").open("w").write(lts.to_dot())
+            self.qdom_factors_state_maps.append({p: lts.states[i] for i, p in enumerate((s,t) for s in factor.states for t in factor.states if (s,t) not in self.dominance_pruning.dominance_relations[i])})
             lts_comp = complement_lts(lts)
 
-            Path(f"nqdom_{i}.dot").open("w").write(lts_comp.to_dot())
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                Path(f"nqdom_{i}.dot").open("w").write(lts_comp.to_dot())
             self.qdom_factors.append(lts_comp)
             logging.debug(f"Automaton for {factor.name} has {len(lts_comp.states)} states and {len(lts_comp.transitions)} transitions.")
+
+
+    def _select_transitions(self, candidate_transitions: list[_AUTOMATA_TR], i: int) -> list[_AUTOMATA_TR]:
+        if len(candidate_transitions) <= 1:
+            return candidate_transitions
+        elif any((s_prime, t_prime) in self.dominance_pruning.dominance_relations[i] for _, _, (s_prime, t_prime) in candidate_transitions):
+            (s,t), l, _ = candidate_transitions[0]
+            return [((s,t), l, (s,s))] # Add transition to universal true, e.g. identity here
+        elif self.approximate_to_deterministic:
+            # Only select one of the candidate transitions
+            def cmp_transition(tr1: QualifiedDominanceHeuristic._AUTOMATA_TR, tr2: QualifiedDominanceHeuristic._AUTOMATA_TR):
+                s1, t1 = tr1[2]
+                s2, t2 = tr2[2]
+                assert s1 == s2
+                # Prefer transitions to states that dominate the other transition's target state
+                t2_dom_t1 = (t1, t2) in self.dominance_pruning.dominance_relations[i]
+                t1_dom_t2 = (t2, t1) in self.dominance_pruning.dominance_relations[i]
+                if t2_dom_t1 and not t1_dom_t2:
+                    return -1
+                elif t1_dom_t2 and not t2_dom_t1:
+                    return 1
+                else:
+                    # Prefer trasitions that keep one step behind the s state (this might not make that much sense)
+                    if t1 == tr1[0][0]:
+                        return 1
+                    elif t2 == tr2[0][0]:
+                        return -1
+                    else:
+                        return 0
+
+            return [max(candidate_transitions, key=cmp_to_key(cmp_transition))]
+        else:
+            return candidate_transitions
 
     def __call__(self, node: 'SearchNode'):
         """
@@ -160,21 +260,13 @@ class QualifiedDominanceHeuristic(Heuristic):
         """
         self.extended_task.factors = self.task.factors.copy()
         state: FactoredTaskState = copy.deepcopy(node.state)
-        for prev_g, prev_state in self.seen_states:
-            if prev_g <= node.g:
-                not_dom_factors = [i for i in range(self.task.size()) if (state.states[i], prev_state.states[i]) not in self.dominance_pruning.dominance_relations[i]]
-                if len(not_dom_factors) == 0:
-                    # This state is completely dominated, assign h=∞
-                    return float('inf')
-                elif len(not_dom_factors) == 1:
-                    # This state is dominated in all but one factor, add the qualified dominance automaton for that factor
-                    ndf = not_dom_factors[0]
-                    self.extended_task.factors.append(self.qdom_factors[ndf])
-                    state.states.append(self.qdom_factors_state_maps[ndf][(state.states[ndf], prev_state.states[ndf])])
-                else:
-                    # This state is not-dominated in multiple factors, it cannot be used
-                    pass
-
+        for prev_state, ndf in self.comparison_strategy.get_compare_states(node):
+            if ndf == -1:
+                return float('inf')
+            # This state is dominated in all but one factor, add the qualified dominance automaton for that factor
+            self.extended_task.factors.append(self.qdom_factors[ndf])
+            state.states.append(self.qdom_factors_state_maps[ndf][(state.states[ndf], prev_state.states[ndf])])
+            
         if self.heuristic == SaturatedCostPartitioningHeuristic:
             h = self.heuristic(self.extended_task,
                                # order=range(extended_task.size())[::-1],

@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import Type
 
 from pyperplan.heuristics.heuristic_base import Heuristic
-from pyperplan.heuristics.qualified_dominance_heuristic import complement_lts
+from pyperplan.heuristics.qualified_dominance_heuristic import complement_lts, ComparisonStrategy, \
+    AllComparisonStrategy, ParentComparisonStrategy
 from pyperplan.pruning.dominance_pruning import DOMINATES_IN_ALL, DOMINATES_IN_NONE
 from pyperplan.pruning.two_non_dominated_label_dominance_pruning import TwoNonDominatedLabelDominancePruning
 from pyperplan.search.searchspace import SearchNode
@@ -18,8 +19,9 @@ class InterdimensionalQualifiedDominance:
     of states. In contrast to normal qualified dominance, interdimensional qualified dominance allows to jump from one
     factor to another, it the target state dominates but the label does not dominate in the other factor.
     """
+    _AUTOMATA_TR = tuple[tuple[int, FactorState, FactorState], str, tuple[int, FactorState, FactorState]]
 
-    def __init__(self, task: FactoredTask, base_heuristic: Type[Heuristic], approximate_to_deterministic: bool = False):
+    def __init__(self, task: FactoredTask, base_heuristic: Type[Heuristic], approximate_to_deterministic: bool = False, comparison_strategy: type[ComparisonStrategy] = AllComparisonStrategy):
         super().__init__()
         self.dominance_pruning = TwoNonDominatedLabelDominancePruning(task)
         self.heuristic: Type[Heuristic] = base_heuristic
@@ -30,7 +32,8 @@ class InterdimensionalQualifiedDominance:
 
 
         self._compute_qualified_dominance()
-        self.seen_states: list[tuple[int, FactoredTaskState]] = []
+
+        self.comparison_strategy = comparison_strategy(self)
         self.extended_task = copy.deepcopy(task)
 
     def _compute_qualified_dominance(self):
@@ -108,45 +111,8 @@ class InterdimensionalQualifiedDominance:
                                     for s_j_prime_prime in l_prime_trs:
                                         candidate_transitions.append(((i, s, t), l, (j, s_j_prime, s_j_prime_prime)))
 
-                        if len(candidate_transitions) <= 1:
-                            for (i, s, t), l, (j, s_prime, t_prime) in candidate_transitions:
-                                transitions.add((state_name(i, s, t), l, state_name(j, s_prime, t_prime)))
-                        elif any((s_prime, t_prime) in self.dominance_pruning.dominance_relations[j] for _, _, (j, s_prime, t_prime) in candidate_transitions):
-                            transitions.add((state_name(i, s, t), l, universal_true))
-                        elif self.approximate_to_deterministic:
-                            # Only select one of the candidate transitions
-                            TR = tuple[tuple[int, FactorState, FactorState], str, tuple[int, FactorState, FactorState]]
-                            def cmp_transition(tr1: TR, tr2: TR):
-                                j1, s1, t1 = tr1[2]
-                                j2, s2, t2 = tr2[2]
-                                if j1 == j2:
-                                    assert s1 == s2
-                                    t2_dom_t1 = (t1, t2) in self.dominance_pruning.dominance_relations[j1]
-                                    t1_dom_t2 = (t2, t1) in self.dominance_pruning.dominance_relations[j1]
-                                    if t2_dom_t1 and not t1_dom_t2:
-                                        return -1
-                                    elif t1_dom_t2 and not t2_dom_t1:
-                                        return 1
-                                    else:
-                                        if t1 == tr1[0][1]:
-                                            return 1
-                                        elif t2 == tr2[0][1]:
-                                            return -1
-                                        else:
-                                            return 0
-                                else:
-                                    if j1 == i and j2 != i:
-                                        return 1
-                                    elif j2 == i and j1 != i:
-                                        return -1
-                                    else:
-                                        return 0
-
-                            best_transition = max(candidate_transitions, key=cmp_to_key(cmp_transition))
-                            transitions.add((state_name(i, s, t), l, state_name(best_transition[2][0], best_transition[2][1], best_transition[2][2])))
-                        else:
-                            for (i, s, t), l, (j, s_prime, t_prime) in candidate_transitions:
-                                transitions.add((state_name(i, s, t), l, state_name(j, s_prime, t_prime)))
+                        for (i,s,t), l, (j, s_prime, t_prime) in self._select_transitions(candidate_transitions):
+                            transitions.add((state_name(i, s,t), l, state_name(j, s_prime, t_prime)))
 
                     for l in labels_not_applicable_at_s:
                         # Map this to a universally true state
@@ -169,6 +135,44 @@ class InterdimensionalQualifiedDominance:
         self.qdom_automaton = lts_comp
         logging.debug(f"Automaton has {len(lts_comp.states)} states and {len(lts_comp.transitions)} transitions.")
 
+    def _select_transitions(self, candidate_transitions: list[_AUTOMATA_TR]) -> list[_AUTOMATA_TR]:
+        if len(candidate_transitions) <= 1:
+            return candidate_transitions
+        elif any((s_prime, t_prime) in self.dominance_pruning.dominance_relations[j] for _, _, (j, s_prime, t_prime) in candidate_transitions):
+            (i,s,t), l, _ = candidate_transitions[0]
+            return [((i,s,t), l, (i,s,s))] # Add transition to universal true, e.g. identity here
+        elif self.approximate_to_deterministic:
+            # Only select one of the candidate transitions
+            def cmp_transition(tr1: InterdimensionalQualifiedDominance._AUTOMATA_TR, tr2: InterdimensionalQualifiedDominance._AUTOMATA_TR):
+                j1, s1, t1 = tr1[2]
+                j2, s2, t2 = tr2[2]
+                if j1 == j2:
+                    assert s1 == s2
+                    t2_dom_t1 = (t1, t2) in self.dominance_pruning.dominance_relations[j1]
+                    t1_dom_t2 = (t2, t1) in self.dominance_pruning.dominance_relations[j1]
+                    if t2_dom_t1 and not t1_dom_t2:
+                        return -1
+                    elif t1_dom_t2 and not t2_dom_t1:
+                        return 1
+                    else:
+                        if t1 == tr1[0][1]:
+                            return 1
+                        elif t2 == tr2[0][1]:
+                            return -1
+                        else:
+                            return 0
+                else:
+                    i = tr1[0][0]
+                    if j1 == i and j2 != i:
+                        return 1
+                    elif j2 == i and j1 != i:
+                        return -1
+                    else:
+                        return 0
+
+            return [max(candidate_transitions, key=cmp_to_key(cmp_transition))]
+        else:
+            return candidate_transitions
 
     def __call__(self, node: 'SearchNode'):
         """
@@ -176,32 +180,27 @@ class InterdimensionalQualifiedDominance:
         """
         self.extended_task.factors = self.task.factors.copy()
         state: FactoredTaskState = copy.deepcopy(node.state)
-        for prev_g, prev_state in self.seen_states:
-            if prev_g <= node.g:
-                not_dom_factors = [i for i in range(self.task.size()) if (state.states[i], prev_state.states[i]) not in self.dominance_pruning.dominance_relations[i]]
-                if len(not_dom_factors) == 0:
-                    # This state is completely dominated, assign h=∞
-                    return float('inf')
-                elif len(not_dom_factors) == 1:
-                    # This state is dominated in all but one factor, add the qualified dominance automaton for that factor
-                    ndf = not_dom_factors[0]
-                    self.extended_task.factors.append(self.qdom_automaton)
-                    state.states.append(self.qdom_factors_state_maps[(ndf, state.states[ndf], prev_state.states[ndf])])
-                    self.qdom_automaton.initial_state = self.qdom_factors_state_maps[(ndf, state.states[ndf], prev_state.states[ndf])]
-                    # reduced = copy.copy(self.qdom_automaton)
-                    # reduced.remove_deadends_and_unreachable()
-                    # Path('st_iqdom.dot').open('w').write(reduced.to_dot())
-                    # pass
-                else:
-                    # This state is not-dominated in multiple factors, it cannot be used
-                    pass
+        # logging.debug(f"Evaluating state {state} (g={node.g})")
 
-        # print(f"Evaluating {state}")
+        for prev_state, ndf in self.comparison_strategy.get_compare_states(node):
+            if ndf == -1:
+                return float('inf')
+            # This state is dominated in all but one factor, add the qualified dominance automaton for that factor
+            self.extended_task.factors.append(self.qdom_automaton)
+            state.states.append(self.qdom_factors_state_maps[(ndf, state.states[ndf], prev_state.states[ndf])])
+            self.qdom_automaton.initial_state = self.qdom_factors_state_maps[ (ndf, state.states[ndf], prev_state.states[ndf])]
+            # reduced = copy.copy(self.qdom_automaton)
+            # reduced.remove_deadends_and_unreachable()
+            # Path('st_iqdom.dot').open('w').write(reduced.to_dot())
+            # pass
+
+        # h_ref = self.heuristic(self.task)
         h = self.heuristic(self.extended_task)
 
         # print(extended_task.save_dot(Path("extended_task.dot")))
 
-        self.seen_states.append((node.g, node.state))
+        # value_ref = h_ref(node)
         value = h(SearchNode(state, node.parent, node.action, node.g))
+        # logging.debug(f"h/h_ref={(value + 0.00001) / (value_ref + 0.00001)} (g={node.g})")
         # print(f"h={value}")
         return value

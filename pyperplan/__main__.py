@@ -98,6 +98,11 @@ def main():
     argparser.add_argument("--qdom-approx", action="store_true",
         help="Approximate qualified dominance so that it is deterministic",
     )
+    argparser.add_argument("--qdom-compare",
+        choices=["all", "parent"],
+        default="all",
+        help="Which strategy to use for comparing nodes in qualified dominance",
+    )
     argparser.add_argument(
         "--draw-search-space",
         choices=['none', 'graph'],
@@ -133,6 +138,15 @@ def main():
     search = SEARCHES[args.search]
     heuristic = HEURISTICS[args.heuristic]
     pruning = PRUNING[args.pruning]
+
+    if args.qdom_compare == "all":
+        from pyperplan.heuristics.qualified_dominance_heuristic import AllComparisonStrategy
+        args.qdom_compare = AllComparisonStrategy
+    elif args.qdom_compare == "parent":
+        from pyperplan.heuristics.qualified_dominance_heuristic import ParentComparisonStrategy
+        args.qdom_compare = ParentComparisonStrategy
+    else:
+        raise ValueError(f"Unknown qdom comparison strategy: {args.qdom_compare}")
 
     if args.search in ["bfs", "ids", "sat"]:
         heuristic = None
