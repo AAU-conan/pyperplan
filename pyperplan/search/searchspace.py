@@ -18,7 +18,7 @@
 """
 Building the search node and associated methods
 """
-from pyperplan.task import Operator
+from pyperplan.task import Operator, Task
 from typing import List, Optional
 
 
@@ -69,10 +69,10 @@ def make_root_node(initial_state: frozenset) -> SearchNode:
     return SearchNode(initial_state, None, None, 0)
 
 
-def make_child_node(parent_node: SearchNode, action: Operator, state: frozenset) -> SearchNode:
+def make_child_node(parent_node: SearchNode, action: Operator, state: frozenset, task: Task) -> SearchNode:
     """
     Construct a new search node containing the state and the applied action.
     The node is linked to the given parent node.
     The g-value is set to the parents g-value + 1.
     """
-    return SearchNode(state, parent_node, action, parent_node.g + 1)
+    return SearchNode(state, parent_node, action, parent_node.g + task.get_action_cost(action))

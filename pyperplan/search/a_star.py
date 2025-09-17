@@ -204,7 +204,7 @@ def astar_search(
                     else:
                         logging.debug("keeping operator %s" % op.name)
 
-                succ_node = searchspace.make_child_node(pop_node, op, succ_state)
+                succ_node = searchspace.make_child_node(pop_node, op, succ_state, task)
 
                 search_space_drawer.set_successors(pop_node, op, succ_node)
                 search_space_drawer.set_g_value(succ_node, succ_node.g)

@@ -1,4 +1,5 @@
 from abc import ABC
+from pathlib import Path
 from typing import Any, Callable
 
 from pyperplan.search.searchspace import SearchNode
@@ -50,8 +51,6 @@ class NoneSearchSpaceDrawer(SearchSpaceDrawer):
     def draw(self):
         pass
 
-import graphviz
-
 
 class GraphSearchSpaceDrawer(SearchSpaceDrawer):
     """
@@ -96,10 +95,10 @@ class GraphSearchSpaceDrawer(SearchSpaceDrawer):
         self.goals.add(state)
 
     def draw(self, filename: str = 'search_space'):
-        self.graph = graphviz.Digraph(format='dot')
+        lines = ['digraph G {', '  rankdir=TB;']
         for state, state_id in self.state_map.items():
             label = ', '.join(f"{a}={v}" for a, v in self.attributes[state].items())
-            self.graph.node(str(state_id), label=str(state), _attributes={'xlabel': label, 'peripheries': '2' if state in self.goals else '1', 'shape': 'box'})
+            lines.append(f'  {state_id} [label="{state}", xlabel="{label}", peripheries={"2" if state in self.goals else "1"}, shape="box"];')
 
             aggregated_edges = {}
             for label, succ in self.successors_map.get(state, []):
@@ -108,6 +107,8 @@ class GraphSearchSpaceDrawer(SearchSpaceDrawer):
                 aggregated_edges[(state, succ)].append(label)
 
             for (src, tgt), labels in aggregated_edges.items():
-                self.graph.edge(str(self.state_map[src]), str(self.state_map[tgt]), label='\n'.join(labels))
+                lines.append(f'  {self.state_map[src]} -> {self.state_map[tgt]} [label="{chr(10).join(labels)}"];')
 
-        self.graph.render(filename, view=False)
+        lines.append('}')
+
+        Path(f'{filename}.dot').write_text('\n'.join(lines))

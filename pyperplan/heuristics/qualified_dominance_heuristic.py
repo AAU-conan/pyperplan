@@ -267,13 +267,7 @@ class QualifiedDominanceHeuristic(Heuristic):
             self.extended_task.factors.append(self.qdom_factors[ndf])
             state.states.append(self.qdom_factors_state_maps[ndf][(state.states[ndf], prev_state.states[ndf])])
             
-        if self.heuristic == SaturatedCostPartitioningHeuristic:
-            h = self.heuristic(self.extended_task,
-                               # order=range(extended_task.size())[::-1],
-                               only_reachable_from=state
-            )
-        else:
-            h = self.heuristic(self.extended_task)
+        h = self.heuristic(self.extended_task)
 
         # print(f"Evaluating {state}")
         # print(extended_task.save_dot(Path("extended_task.dot")))
