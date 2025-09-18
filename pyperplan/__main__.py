@@ -92,7 +92,7 @@ def main():
     argparser.add_argument(
         "-t",
         "--task-representation",
-        choices=["strips", "factored"],
+        choices=["strips", "factored", "qdom"],
         help="Select the task representation to use",
         default="strips",
     )

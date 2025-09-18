@@ -34,6 +34,7 @@ from pyperplan.task import Operator, Task, FactoredTask
 from typing import Any, Callable, List, Optional, Type, Union
 
 from .pruning.pruning import Pruning
+from .pruning.qualified_dominance_task_transformation import QualifiedDominanceTaskTransformation
 from .search.search_space_drawer import SearchSpaceDrawer
 from .translate.sas_tasks import SASTask, open_sas_task
 from .translate.translate import pddl_to_sas
@@ -222,7 +223,7 @@ def search_plan(
             raise ValueError("Domain and problem PDDL files must be specified for STRIPS representation")
         problem = _parse(domain_file, problem_file)
         task = _ground(problem)
-    elif task_representation == "factored":
+    elif task_representation == "factored" or task_representation == "qdom":
         if problem_file.endswith('.sas'):
             sas_task: SASTask = open_sas_task(problem_file)
             task_name = os.path.splitext(os.path.basename(problem_file))[0]
@@ -231,7 +232,8 @@ def search_plan(
             sas_task: SASTask = pddl_to_sas(pddl_task)
             task_name = pddl_task.task_name
         task = FactoredTask.from_sas_task(task_name, sas_task)
-        # print(task.to_dot())
+        if task_representation == "qdom":
+            task = QualifiedDominanceTaskTransformation().compute(task)
     else:
         raise ValueError(f"Unknown task representation: {task_representation}")
     logging.info("done reading input!")

@@ -6,9 +6,9 @@ def test_one_factor_dominance():
     task = FactoredTask("simple",
         LabelledTransitionSystem("factor_0", ['a', 'b', 'c'], [('a', 'ac', 'c'), ('b', 'bc', 'c')], 'a', ['c']),
     )
-    a = FactorState('a', 0, 3)
-    b = FactorState('b', 1, 3)
-    c = FactorState('c', 2, 3)
+    a = FactorState('a', 0)
+    b = FactorState('b', 1)
+    c = FactorState('c', 2)
 
     dominance_pruning = DominancePruning(task)
 
@@ -24,9 +24,9 @@ def test_two_factor_dominance():
                         LabelledTransitionSystem("factor_0", ['a', 'b', 'c'], [('a', 'l1', 'c'), ('b', 'l2', 'c')], 'a', ['c']),
                         LabelledTransitionSystem("factor_1", ['a', 'b', 'c'], [('a', 'l1', 'c'), ('a', 'l2', 'c'), ('b', 'l2', 'c')], 'a', ['c']),
                         )
-    a = FactorState('a', 0, 3)
-    b = FactorState('b', 1, 3)
-    c = FactorState('c', 2, 3)
+    a = FactorState('a', 0)
+    b = FactorState('b', 1)
+    c = FactorState('c', 2)
 
     dominance_pruning = DominancePruning(task)
 

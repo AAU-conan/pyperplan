@@ -18,7 +18,7 @@ def determinize_lts(lts: LabelledTransitionSystem) -> LabelledTransitionSystem:
     We need to preserve all states in the original lts.
     """
     # The states in the new transition system are sets of states from the original lts.
-    state_set_to_factored_state = {frozenset([state]): FactorState(f'{state.name}', state.value, -1) for state in lts.states}
+    state_set_to_factored_state = {frozenset([state]): FactorState(f'{state.name}', state.value) for state in lts.states}
     worklist = [frozenset([state]) for state in lts.states]
     labels = set(l for _, l, _ in lts.transitions)
 
@@ -35,8 +35,7 @@ def determinize_lts(lts: LabelledTransitionSystem) -> LabelledTransitionSystem:
             if target_set not in state_set_to_factored_state:
                 state_set_to_factored_state[target_set] = FactorState(
                     f'{{{",".join(s.name for s in target_set)}}}',
-                    len(state_set_to_factored_state),
-                    -1
+                    len(state_set_to_factored_state)
                 )
                 worklist.append(target_set)
 
@@ -44,7 +43,7 @@ def determinize_lts(lts: LabelledTransitionSystem) -> LabelledTransitionSystem:
 
     return LabelledTransitionSystem.from_factored(
         lts.name + '_determinized',
-        [v for _, v in state_set_to_factored_state.items()],
+        [FactorState(v.name, v.value) for _, v in state_set_to_factored_state.items()],
         transitions,
         initial_state=state_set_to_factored_state[frozenset([lts.initial_state])],
         goal_states={fs for state_set, fs in state_set_to_factored_state.items() if any(s in lts.goal_states for s in state_set)}
@@ -165,14 +164,17 @@ class QualifiedDominanceHeuristic(Heuristic):
                 if (s,t) in self.dominance_pruning.dominance_relations[i]:
                     return universal_true
                 return f"{s.name} < {t.name}"
-            states = [state_name(s,t) for s in factor.states for t in factor.states if (s,t) not in self.dominance_pruning.dominance_relations[i]] + [state_name(s, FactorState("⊥", -1, -1)) for s in factor.states]
+            states = [state_name(s,t) for s in factor.states for t in factor.states if (s,t) not in self.dominance_pruning.dominance_relations[i]] + [state_name(s, FactorState("⊥", -1)) for s in factor.states]
             states.append(universal_true)
 
             transitions = set((universal_true, l, universal_true) for l in self.task.labels)
             goal_states = [universal_true]
 
             for s in factor.states:
-                for t in factor.states + [FactorState("⊥", -1, -1)]:
+                for t in factor.states + [FactorState("⊥", -1)]:
+                    if (s,t) in self.dominance_pruning.dominance_relations[i]:
+                        continue
+
                     if s not in factor.goal_states or (t.name != '⊥' and t in factor.goal_states):
                         goal_states.append(state_name(s, t))
 
@@ -194,7 +196,7 @@ class QualifiedDominanceHeuristic(Heuristic):
                                     any_transition = True
 
                         if not any_transition and self.intersect_original_factor:
-                            candidate_transitions.append(((s, t), l, (s_prime, FactorState("⊥", -1, -1))))
+                            candidate_transitions.append(((s, t), l, (s_prime, FactorState("⊥", -1))))
 
                         for (s,t), l, (s_prime, t_prime) in self._select_transitions(candidate_transitions, i):
                             transitions.add((state_name(s,t), l, state_name(s_prime, t_prime)))

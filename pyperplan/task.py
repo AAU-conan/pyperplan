@@ -171,13 +171,12 @@ def pretty_name(name: str) -> str:
     return name.replace("NegatedAtom ", "~").replace("Atom ", "").replace("()", "")
 
 class FactorState:
-    def __init__(self, name: str, value: int, bound: int):
+    def __init__(self, name: str, value: int):
         self.name = pretty_name(name)
         self.value = value
-        self.bound = bound  # Maximum value this factor can take
 
     def validate(self):
-        assert self.value < self.bound, f"Value {self.value} of factor {self.name} must be less than its bound {self.bound}"
+        return True
 
     def __str__(self):
         return f"{self.name}"
@@ -204,8 +203,6 @@ class FactoredTaskState:
 
     def validate(self):
         for i, state in enumerate(self.states):
-            if self.task:
-                assert state.bound == self.task.factors[i].size()
             state.validate()
 
     def size(self):
@@ -230,7 +227,7 @@ class FactoredTaskState:
 class LabelledTransitionSystem:
     def __init__(self, name: str, states: list[str], transitions: list[Tuple[str, str, str]], initial_state: str, goal_states: list[str]):
         self.name = name
-        state_name_to_factor_state: dict[str, FactorState] = {state: FactorState(state, i, len(states)) for i, state in enumerate(states)}
+        state_name_to_factor_state: dict[str, FactorState] = {state: FactorState(state, i) for i, state in enumerate(states)}
         self.states: list[FactorState] = [fs for _, fs in state_name_to_factor_state.items()]
         self.initial_state: Optional[FactorState] = state_name_to_factor_state.get(initial_state, None)
         self.transitions: list[tuple[FactorState, str, FactorState]] = [(state_name_to_factor_state[src], label, state_name_to_factor_state[dst]) for src, label, dst in transitions]
@@ -293,9 +290,7 @@ class LabelledTransitionSystem:
             assert src in self.states
             assert dst in self.states
 
-        bound = self.states[0].bound
         for s in self.states:
-            assert s.bound == bound, f"All states must have the same bound, but {s.name} has {s.bound} while others have {bound}"
             s.validate()
 
         assert len(self.goal_states) > 0, "At least one goal state must be defined"
@@ -404,7 +399,7 @@ class FactoredTask(Task):
         self._ordered_labels = list(sorted(self.labels))
         self.label_costs: dict[str, int] = {label: 1 for label in self.labels} if label_costs is None else label_costs
         self.validate()
-        super().__init__(name, FactoredTaskState(*[FactorState(factor.initial_state.name, factor.initial_state.value, factor.initial_state.bound) for factor in self.factors], task=self))
+        super().__init__(name, FactoredTaskState(*[FactorState(factor.initial_state.name, factor.initial_state.value) for factor in self.factors], task=self))
 
     def size(self):
         return len(self.factors)
