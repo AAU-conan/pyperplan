@@ -34,8 +34,8 @@ class QualifiedDominanceTaskTransformation:
                     ∃ s -l-> s' and ∃ t -l'-> t' s.t. l' dominates l in all other factors
                 d. Otherwise, add a transition to (s', ⊥) with label l
         """
-        # if logging.getLogger().isEnabledFor(logging.DEBUG):
-        #     Path("pre_transformation_task.dot").write_text(task.to_dot())
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            Path("pre_transformation_task.dot").write_text(task.to_dot())
         dominance_pruning = DominancePruning(task)
         dominance_relations = dominance_pruning.dominance_relations
         new_factors: list[LabelledTransitionSystem] = []
@@ -119,8 +119,8 @@ class QualifiedDominanceTaskTransformation:
             f._compute_cached_values()
 
         res = FactoredTask(f'qdom_{task.name}', *new_factors, label_costs={l: c for l,c in task.label_costs.items() if l not in dead_labels})
-        # if logging.getLogger().isEnabledFor(logging.DEBUG):
-        #     Path("post_transformation_task.dot").write_text(res.to_dot())
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            Path("post_transformation_task.dot").write_text(res.to_dot())
         return res
 
 

@@ -19,7 +19,10 @@ class SaturatedCostPartitioningHeuristic:
         self.task = task
         self.factor_goal_costs: list[dict[FactorState, int]]
 
-        self._compute_saturated_cost_partitioning(range(self.task.size()) if order is None else order, only_reachable_from)
+        if order is None:
+            # order = list(sorted(range(task.size()), key=lambda i: -len(task.factors[i].goal_states)))
+            order = list(range(task.size()))
+        self._compute_saturated_cost_partitioning(order, only_reachable_from)
 
     def _compute_saturated_cost_partitioning(self, order, only_reachable_from: Optional[FactoredTaskState]):
         label_costs = self.task.label_costs.copy()

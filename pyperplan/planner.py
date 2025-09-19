@@ -22,6 +22,7 @@ import re
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 from . import grounding, heuristics, search, tools
 from .heuristics.heuristic_base import Heuristic
@@ -230,6 +231,7 @@ def search_plan(
         else:
             pddl_task = open_pddl(domain_file, problem_file)
             sas_task: SASTask = pddl_to_sas(pddl_task)
+            sas_task.output(Path("output.sas").open("w"))
             task_name = pddl_task.task_name
         task = FactoredTask.from_sas_task(task_name, sas_task)
         if task_representation == "qdom":

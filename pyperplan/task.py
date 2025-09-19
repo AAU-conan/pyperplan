@@ -368,20 +368,25 @@ class LabelledTransitionSystem:
                     worklist.append(src)
 
         # Find all states reachable from the initial state using forward graph search
-        assert self.initial_state in reachable_from_goal
-        reachable_from_init_and_goal = {self.initial_state}
-        worklist = [self.initial_state]
-        while worklist:
-            state = worklist.pop()
-            for _, tgt in self.state_to_label_targets.get(state, []):
-                if tgt not in reachable_from_init_and_goal and tgt in reachable_from_goal:
-                    reachable_from_init_and_goal.add(tgt)
-                    worklist.append(tgt)
+        if self.initial_state not in reachable_from_goal:
+            # Generate empty LTS
+            self.states = [self.initial_state]
+            self.transitions = []
+            self.goal_states = set()
+        else:
+            reachable_from_init_and_goal = {self.initial_state}
+            worklist = [self.initial_state]
+            while worklist:
+                state = worklist.pop()
+                for _, tgt in self.state_to_label_targets.get(state, []):
+                    if tgt not in reachable_from_init_and_goal and tgt in reachable_from_goal:
+                        reachable_from_init_and_goal.add(tgt)
+                        worklist.append(tgt)
 
-        # Keep only states that are both reachable from the initial state and can reach a goal state
-        self.states = list(reachable_from_init_and_goal)
-        self.transitions = [(s, l, t) for s, l, t in self.transitions if s in reachable_from_init_and_goal and t in reachable_from_init_and_goal]
-        self.goal_states = {s for s in self.goal_states if s in reachable_from_init_and_goal}
+            # Keep only states that are both reachable from the initial state and can reach a goal state
+            self.states = list(reachable_from_init_and_goal)
+            self.transitions = [(s, l, t) for s, l, t in self.transitions if s in reachable_from_init_and_goal and t in reachable_from_init_and_goal]
+            self.goal_states = {s for s in self.goal_states if s in reachable_from_init_and_goal}
 
         self._compute_cached_values()
 

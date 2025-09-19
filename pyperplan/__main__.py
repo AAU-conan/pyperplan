@@ -192,7 +192,10 @@ def main():
         if args.plan_file:
             solution_file = args.plan_file
             write_solution(solution, solution_file)
-            validate_solution(args.domain, args.problem, solution_file)
+            if '.sas' not in args.problem:
+                validate_solution(args.domain, args.problem, solution_file)
+            else:
+                logging.info("Cannot validate plans for SAS files.")
 
 
 if __name__ == "__main__":
