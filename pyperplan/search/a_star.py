@@ -143,7 +143,8 @@ def astar_search(
     init_h = heuristic(root)
     search_space_drawer.set_g_value(root, root.g)
     search_space_drawer.set_heuristic(root, init_h)
-    heapq.heappush(open, make_open_entry(root, init_h, node_tiebreaker))
+    if init_h != float("inf"):
+        heapq.heappush(open, make_open_entry(root, init_h, node_tiebreaker))
     logging.info("Initial h value: %f" % init_h)
 
 

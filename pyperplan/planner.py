@@ -234,6 +234,7 @@ def search_plan(
             sas_task.output(Path("output.sas").open("w"))
             task_name = pddl_task.task_name
         task = FactoredTask.from_sas_task(task_name, sas_task)
+        Path("task.dot").write_text(task.to_dot())
         if task_representation == "qdom":
             task = QualifiedDominanceTaskTransformation().compute(task)
     else:
