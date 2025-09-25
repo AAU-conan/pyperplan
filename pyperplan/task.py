@@ -293,7 +293,8 @@ class LabelledTransitionSystem:
         for s in self.states:
             s.validate()
 
-        assert len(self.goal_states) > 0, "At least one goal state must be defined"
+        if logging.getLogger().isEnabledFor(logging.DEBUG) and len(self.goal_states) == 0:
+            logging.warning("No goal state is defined")
 
     def transitions_of_state(self, s: FactorState):
         """
@@ -327,6 +328,8 @@ class LabelledTransitionSystem:
         """
         Generate a dot representation of the labelled transition system.
         """
+        if not logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.warning("Doing dot graph generation without debug.")
         dot_lines = []
         dot_lines.append("digraph LTS {")
         dot_lines.append(f'  label="{self.name}";')
@@ -484,6 +487,8 @@ class FactoredTask(Task):
         """
         Generate a DOT representation of the factored task. Use the dot of each factor.
         """
+        if not logging.getLogger().isEnabledFor(logging.DEBUG):
+            logging.warning("Doing dot graph generation without debug.")
         res = "digraph FactoredTask {\n"
         for factor in self.factors:
             factor_dotlines = factor.to_dot().splitlines()[1:-1]  # Remove the first and last line (digraph ... { and })

@@ -120,4 +120,4 @@ class UpfrontOptimalCostPartitioningHeuristic(Heuristic):
         self.factor_goal_costs = [{s: self.factor_state_to_goal_cost[(i, s)].varValue for s in factor.states} for i, factor in enumerate(self.task.factors)]
 
     def __call__(self, node: 'SearchNode') -> float:
-        return math.ceil(sum(self.factor_goal_costs[i][s] for i, s in enumerate(node.state.states)) - 0.00001)
+        return math.ceil(sum(self.factor_goal_costs[i][s] for i, s in enumerate(node.state.states)) - 0.001)

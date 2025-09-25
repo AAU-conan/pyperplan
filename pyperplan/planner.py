@@ -231,10 +231,12 @@ def search_plan(
         else:
             pddl_task = open_pddl(domain_file, problem_file)
             sas_task: SASTask = pddl_to_sas(pddl_task)
-            sas_task.output(Path("output.sas").open("w"))
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                sas_task.output(Path("output.sas").open("w"))
             task_name = pddl_task.task_name
         task = FactoredTask.from_sas_task(task_name, sas_task)
-        Path("task.dot").write_text(task.to_dot())
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+           Path("task.dot").write_text(task.to_dot())
         if task_representation == "qdom":
             task = QualifiedDominanceTaskTransformation().compute(task)
     else:

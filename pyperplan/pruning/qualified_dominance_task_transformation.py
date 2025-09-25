@@ -110,7 +110,11 @@ class QualifiedDominanceTaskTransformation:
             )
             lts_comp = complement_lts(lts)
             lts_comp.remove_deadends_and_unreachable()
-            new_factors.append(lts_comp)
+
+            task.factors[i] = lts_comp
+
+            # Update the label relation, as this might have changed now
+            dominance_pruning._update_label_relation()
 
         # Remove dead labels
         dead_labels = {l for l in task.labels if any(len(f.transitions_of_label(l)) == 0 for f in new_factors)}
@@ -118,10 +122,10 @@ class QualifiedDominanceTaskTransformation:
             f.transitions = [t for t in f.transitions if t[1] not in dead_labels]
             f._compute_cached_values()
 
-        res = FactoredTask(f'qdom_{task.name}', *new_factors, label_costs={l: c for l,c in task.label_costs.items() if l not in dead_labels})
+        task.labels = task.labels - dead_labels
         if logging.getLogger().isEnabledFor(logging.DEBUG):
-            Path("post_transformation_task.dot").write_text(res.to_dot())
-        return res
+            Path("post_transformation_task.dot").write_text(task.to_dot())
+        return task
 
 
     def _select_transitions(self, candidate_transitions: list, i: int, dom_rel) -> list:
