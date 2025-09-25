@@ -21,7 +21,7 @@ Pyperplan requires [Python](https://python.org) >= 3.7.
 
 From the Python package index (PyPI):
 
-    pip install pyperplan
+    pip install git+https://github.com/AAU-conan/pyperplan
 
 From inside a repository clone:
 
