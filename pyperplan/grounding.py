@@ -24,17 +24,19 @@ from collections import defaultdict
 import itertools
 import logging
 import re
+from typing import DefaultDict, Dict, List, Set
 
-from .task import Operator, Task
+from pyperplan.pddl.pddl import Action, Predicate, Problem, Type
+from pyperplan.task import Operator, Task
+
+from .task import Operator, STRIPSTask, Task
 
 
 # controls mass log output
 verbose_logging = False
 
 
-def ground(
-    problem, remove_statics_from_initial_state=True, remove_irrelevant_operators=True
-):
+def ground(problem: Problem, remove_statics_from_initial_state: bool = True, remove_irrelevant_operators: bool = True) -> Task:
     """
     This is the main method that grounds the PDDL task and returns an
     instance of the task.Task class.
@@ -107,10 +109,10 @@ def ground(
         operators = _relevance_analysis(operators, goals)
 
     name = problem.name
-    return Task(name, facts, init, goals, operators)
+    return STRIPSTask(name, facts, init, goals, operators)
 
 
-def _relevance_analysis(operators, goals):
+def _relevance_analysis(operators: List[Operator], goals: frozenset) -> List[Operator]:
     """This implements a relevance analysis of operators.
 
     We start with all facts within the goal and iteratively compute
@@ -184,7 +186,7 @@ def _get_statics(predicates, actions):
     return statics
 
 
-def _create_type_map(objects):
+def _create_type_map(objects: Dict[str, Type]) -> DefaultDict[Type, Set[str]]:
     """
     Create a map from each type to its objects.
 
@@ -210,7 +212,7 @@ def _create_type_map(objects):
     return type_map
 
 
-def _collect_facts(operators):
+def _collect_facts(operators: List[Operator]) -> Set[str]:
     """
     Collect all facts from grounded operators (precondition, add
     effects and delete effects).
@@ -235,7 +237,7 @@ def _ground_actions(actions, type_map, statics, init):
     return operators
 
 
-def _find_pred_in_init(pred_name, param, sig_pos, init):
+def _find_pred_in_init(pred_name: str, param: str, sig_pos: int, init: frozenset) -> bool:
     """
     This method is used to check whether an instantiation of the predicate
     denoted by pred_name with the parameter param at position sig_pos is
@@ -257,7 +259,7 @@ def _find_pred_in_init(pred_name, param, sig_pos, init):
     return any([match_init.match(string) for string in init])
 
 
-def _ground_action(action, type_map, statics, init):
+def _ground_action(action: Action, type_map: DefaultDict[Type, Set[str]], statics: List[str], init: frozenset) -> filter:
     """
     Ground the action and return the resulting list of operators.
     """
@@ -294,28 +296,22 @@ def _ground_action(action, type_map, statics, init):
                                 remove_debug += 1
                             objects.remove(o)
     if verbose_logging:
-        logging.info(
-            "Static precondition analysis removed %d possible objects" % remove_debug
-        )
+        logging.info("Static precondition analysis removed %d possible objects" % remove_debug)
 
     # save a list of possible assignment tuples (param_name, object)
-    domain_lists = [
-        [(name, obj) for obj in objects] for name, objects in param_to_objects.items()
-    ]
+    domain_lists = [[(name, obj) for obj in objects] for name, objects in param_to_objects.items()]
     # Calculate all possible assignments
     assignments = itertools.product(*domain_lists)
 
     # Create a new operator for each possible assignment of parameters
-    ops = [
-        _create_operator(action, dict(assign), statics, init) for assign in assignments
-    ]
+    ops = [_create_operator(action, dict(assign), statics, init) for assign in assignments]
     # Filter out the None values
     ops = filter(bool, ops)
 
     return ops
 
 
-def _create_operator(action, assignment, statics, init):
+def _create_operator(action: Action, assignment: Dict[str, str], statics: List[str], init: frozenset) -> Operator:
     """Create an operator for "action" and "assignment".
 
     Statics are handled here. True statics aren't added to the
@@ -350,13 +346,13 @@ def _create_operator(action, assignment, statics, init):
     return Operator(name, precondition_facts, add_effects, del_effects)
 
 
-def _get_grounded_string(name, args):
+def _get_grounded_string(name: str, args: List[str]) -> str:
     """We use the lisp notation (e.g. "(unstack c e)")."""
     args_string = " " + " ".join(args) if args else ""
     return f"({name}{args_string})"
 
 
-def _ground_atom(atom, assignment):
+def _ground_atom(atom: Predicate, assignment: Dict[str, str]) -> str:
     """
     Return a string with the grounded representation of "atom" with respect
     to "assignment".
@@ -370,17 +366,17 @@ def _ground_atom(atom, assignment):
     return _get_grounded_string(atom.name, names)
 
 
-def _ground_atoms(atoms, assignment):
+def _ground_atoms(atoms: Set[Predicate], assignment: Dict[str, str]) -> Set[str]:
     """Return a set of the grounded representation of the atoms."""
     return {_ground_atom(atom, assignment) for atom in atoms}
 
 
-def _get_fact(atom):
+def _get_fact(atom: Predicate) -> str:
     """Return the string representation of the grounded atom."""
     args = [name for name, types in atom.signature]
     return _get_grounded_string(atom.name, args)
 
 
-def _get_partial_state(atoms):
+def _get_partial_state(atoms: List[Predicate]) -> frozenset:
     """Return a set of the string representation of the grounded atoms."""
     return frozenset(_get_fact(atom) for atom in atoms)

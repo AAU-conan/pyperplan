@@ -386,9 +386,7 @@ def _parse_type_helper(iter, type_class):
                 # must contain either definition
                 types_iter = next(iter)
                 if not types_iter.try_match("either"):
-                    raise ValueError(
-                        "Error multiple parent definition must " 'start with "either"'
-                    )
+                    raise ValueError("Error multiple parent definition must " 'start with "either"')
                 tlist = parse_list_template(_parse_string_helper, types_iter)
                 while len(tmpList) != 0:
                     result.append(type_class(tmpList.pop(), tlist))
@@ -473,9 +471,7 @@ def parse_parameters(iter):
     """
     # check that the parameters definition starts with the correct keyword
     if not iter.try_match(":parameters"):
-        raise ValueError(
-            'Error keyword ":parameters" required before ' "parameter list!"
-        )
+        raise ValueError('Error keyword ":parameters" required before ' "parameter list!")
     varList = parse_typed_var_list(next(iter))
     return varList
 
@@ -486,18 +482,14 @@ def parse_requirements_stmt(iter):
     """
     # check for requirements keyword
     if not iter.try_match(":requirements"):
-        raise ValueError(
-            "Error requirements list must contain keyword " '":requirements"'
-        )
+        raise ValueError("Error requirements list must contain keyword " '":requirements"')
     keywords = parse_keyword_list(iter)
     return RequirementsStmt(keywords)
 
 
 def _parse_types_with_error(iter, keyword, classt):
     if not iter.try_match(keyword):
-        raise ValueError(
-            f'Error keyword "{keyword}" required before {classt.__name__}!'
-        )
+        raise ValueError(f'Error keyword "{keyword}" required before {classt.__name__}!')
     return _parse_type_helper(iter, classt)
 
 
@@ -505,9 +497,7 @@ def _parse_types_with_error(iter, keyword, classt):
 # familiar structure.
 # Hence instantiate them with _parse_types_with_error.
 _common_types = [(":types", Type), (":objects", Object), (":constants", Object)]
-(parse_types_stmt, parse_objects_stmt, parse_constants_stmt) = map(
-    lambda tup: lambda it: _parse_types_with_error(it, tup[0], tup[1]), _common_types
-)
+(parse_types_stmt, parse_objects_stmt, parse_constants_stmt) = map(lambda tup: lambda it: _parse_types_with_error(it, tup[0], tup[1]), _common_types)
 
 
 def _parse_domain_helper(iter, keyword):
@@ -516,9 +506,7 @@ def _parse_domain_helper(iter, keyword):
     Returns a DomainStmt instance.
     """
     if not iter.try_match(keyword):
-        raise ValueError(
-            "Error domain statement must be present before " "domain name!"
-        )
+        raise ValueError("Error domain statement must be present before " "domain name!")
     name = parse_name(iter, "domain")
     return DomainStmt(name)
 
@@ -637,9 +625,7 @@ def parse_predicates_stmt(iter):
     Returns a PredicatesStmt instance
     """
     if not iter.try_match(":predicates"):
-        raise ValueError(
-            "Error predicate definition must start with " '":predicates" keyword!'
-        )
+        raise ValueError("Error predicate definition must start with " '":predicates" keyword!')
     preds = parse_predicate_list(iter)
     return PredicatesStmt(preds)
 
@@ -652,10 +638,7 @@ def parse_domain_def(iter):
     """
     defString = parse_name(iter, "domain def")
     if defString != "define":
-        raise ValueError(
-            "Invalid domain definition! --> domain definition "
-            'must start with "define"'
-        )
+        raise ValueError("Invalid domain definition! --> domain definition " 'must start with "define"')
     dom = parse_domain_stmt(next(iter))
     # create new DomainDef
     domain = DomainDef(dom.name)
@@ -703,10 +686,7 @@ def parse_problem_name(iter):
     Returns the name as a string.
     """
     if not iter.try_match("problem"):
-        raise ValueError(
-            "Invalid problem name specification! problem name "
-            'definition must start with "problem"'
-        )
+        raise ValueError("Invalid problem name specification! problem name " 'definition must start with "problem"')
     name = parse_name(iter, "problem name")
     return name
 
@@ -720,10 +700,7 @@ def parse_problem_def(iter):
     Returns a ProblemDef instance
     """
     if not iter.try_match("define"):
-        raise ValueError(
-            "Invalid problem definition! --> problem definition "
-            'must start with "define"'
-        )
+        raise ValueError("Invalid problem definition! --> problem definition " 'must start with "define"')
     # parse problem name and corresponding domain name
     probname = parse_problem_name(next(iter))
     dom = parse_problem_domain_stmt(next(iter))

@@ -24,9 +24,7 @@ finisher1-stack-letter sheet1 dummy-sheet
 """
 optimal_plan = [op.strip() for op in optimal_plan.splitlines()]
 
-benchmarks = os.path.abspath(
-    os.path.join(os.path.abspath(__file__), "../../../benchmarks")
-)
+benchmarks = os.path.abspath(os.path.join(os.path.abspath(__file__), "../../../benchmarks"))
 
 # Collect problem files
 problem_file = os.path.join(benchmarks, "parcprinter", "task01.pddl")
@@ -41,7 +39,7 @@ for step, op_name in enumerate(optimal_plan, start=1):
     for op, successor_state in task.get_successor_states(node.state):
         if not op.name.strip("()") == op_name:
             continue
-        node = searchspace.make_child_node(node, op, successor_state)
+        node = searchspace.make_child_node(node, op, successor_state, task)
 
 # Check that we reached the goal
 assert len(task.goals - node.state) == 0

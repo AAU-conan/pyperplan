@@ -21,11 +21,15 @@ Landmarks Heuristic
 
 from collections import defaultdict
 import copy
+from typing import DefaultDict, Set, Union
+
+from pyperplan.search.searchspace import SearchNode
+from pyperplan.task import Task
 
 from .heuristic_base import Heuristic
 
 
-def _get_relaxed_task(task):
+def _get_relaxed_task(task: Task) -> Task:
     """
     Removes the delete effects of every operator in task
     """
@@ -35,7 +39,7 @@ def _get_relaxed_task(task):
     return relaxed_task
 
 
-def get_landmarks(task):
+def get_landmarks(task: Task) -> Set[str]:
     """Returns a set of landmarks.
 
     In this implementation a fact is a landmark if the goal facts cannot be
@@ -65,7 +69,7 @@ def get_landmarks(task):
     return landmarks
 
 
-def compute_landmark_costs(task, landmarks):
+def compute_landmark_costs(task: Task, landmarks: Set[str]) -> DefaultDict[str, float]:
     """
     Compute uniform cost partitioning for actions depending on the landmarks
     they achieve.
@@ -84,14 +88,14 @@ def compute_landmark_costs(task, landmarks):
 
 
 class LandmarkHeuristic(Heuristic):
-    def __init__(self, task):
+    def __init__(self, task: Task):
         self.task = task
 
         self.landmarks = get_landmarks(task)
         assert self.task.goals <= self.landmarks
         self.costs = compute_landmark_costs(task, self.landmarks)
 
-    def __call__(self, node):
+    def __call__(self, node: SearchNode) -> Union[float, int]:
         """Returns the heuristic value for "node"."""
         if node.parent is None:
             # At the beginning only the initial facts are achieved

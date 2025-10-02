@@ -89,12 +89,8 @@ def test_parsePredicates():
         "?x",
         "?x",
     ]
-    assert [
-        p.parameters[0].types[0] for p in pred.predicates if p.parameters != []
-    ] == ["block", "block", "plane", "block"]
-    assert [
-        p.parameters[1].types[0] for p in pred.predicates if len(p.parameters) > 1
-    ] == ["block"]
+    assert [p.parameters[0].types[0] for p in pred.predicates if p.parameters != []] == ["block", "block", "plane", "block"]
+    assert [p.parameters[1].types[0] for p in pred.predicates if len(p.parameters) > 1] == ["block"]
 
 
 def test_parseTypes():
@@ -153,9 +149,7 @@ def test_parsePredicatesLogistics():
         "?obj",
         "?pkg",
     ]
-    assert [
-        p.parameters[0].types[0] for p in pred.predicates if p.parameters != []
-    ] == ["place", "physobj", "package"]
+    assert [p.parameters[0].types[0] for p in pred.predicates if p.parameters != []] == ["place", "physobj", "package"]
 
 
 def test_parseDomainDef():
@@ -227,12 +221,8 @@ def test_parseDomainDef():
         "?x",
         "?x",
     ]
-    assert [
-        p.parameters[0].types[0] for p in pred.predicates if p.parameters != []
-    ] == ["block", "block", "block", "block"]
-    assert [
-        p.parameters[1].types[0] for p in pred.predicates if len(p.parameters) > 1
-    ] == ["block"]
+    assert [p.parameters[0].types[0] for p in pred.predicates if p.parameters != []] == ["block", "block", "block", "block"]
+    assert [p.parameters[1].types[0] for p in pred.predicates if len(p.parameters) > 1] == ["block"]
     assert len(dom.actions) == 4
     action = dom.actions[3]
     assert action.name == "unstack"
@@ -348,11 +338,7 @@ def test_predList2():
         "?a",
         "?l1",
     ]
-    assert [
-        p.parameters[0].types[0]
-        for p in pred.predicates
-        if p.parameters[0].types != None
-    ] == ["person", "person", "aircraft", "flevel"]
+    assert [p.parameters[0].types[0] for p in pred.predicates if p.parameters[0].types != None] == ["person", "person", "aircraft", "flevel"]
 
 
 def test_predList3():

@@ -18,30 +18,29 @@
 import importlib
 import logging
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
 import time
+from typing import Any, Callable, List, Optional, Type, Union
+
+from pyperplan.pddl.pddl import Problem
+from pyperplan.task import FactoredTask, Operator, Task
 
 from . import grounding, heuristics, search, tools
 from .pddl.parser import Parser
-
-
-SEARCHES = {
-    "astar": search.astar_search,
-    "wastar": search.weighted_astar_search,
-    "gbf": search.greedy_best_first_search,
-    "bfs": search.breadth_first_search,
-    "ehs": search.enforced_hillclimbing_search,
-    "ids": search.iterative_deepening_search,
-    "sat": search.sat_solve,
-}
+from .search.search import Search
+from .task_transformation.task_transformation import TaskTransformation
+from .translate.pddl_parser import open as open_pddl
+from .translate.sas_tasks import open_sas_task, SASTask
+from .translate.translate import pddl_to_sas
 
 
 NUMBER = re.compile(r"\d+")
 
 
-def get_heuristics():
+def get_heuristics() -> List[Any]:
     """
     Scan all python modules in the "heuristics" directory for classes ending
     with "Heuristic".
@@ -54,19 +53,11 @@ def get_heuristics():
             continue
         name = "." + os.path.splitext(os.path.basename(filename))[0]
         module = importlib.import_module(name, package="pyperplan.heuristics")
-        heuristics.extend(
-            [
-                getattr(module, cls)
-                for cls in dir(module)
-                if cls.endswith("Heuristic")
-                and cls != "Heuristic"
-                and not cls.startswith("_")
-            ]
-        )
+        heuristics.extend([getattr(module, cls) for cls in dir(module) if cls.endswith("Heuristic") and cls != "Heuristic" and not cls.startswith("_")])
     return heuristics
 
 
-def _get_heuristic_name(cls):
+def _get_heuristic_name(cls: Any) -> str:
     name = cls.__name__
     assert name.endswith("Heuristic")
     return name[:-9].lower()
@@ -75,11 +66,37 @@ def _get_heuristic_name(cls):
 HEURISTICS = {_get_heuristic_name(heur): heur for heur in get_heuristics()}
 
 
-def validator_available():
+def get_pruning_methods() -> List[Any]:
+    """
+    Scan all python modules in the "pruning" directory for classes ending
+    with "Pruning".
+    """
+    pruning_methods = []
+    src_dir = os.path.dirname(os.path.abspath(__file__))
+    pruning_dir = os.path.abspath(os.path.join(src_dir, "pruning"))
+    for filename in os.listdir(pruning_dir):
+        if not filename.endswith(".py"):
+            continue
+        name = "." + os.path.splitext(os.path.basename(filename))[0]
+        module = importlib.import_module(name, package="pyperplan.pruning")
+        pruning_methods.extend([getattr(module, cls) for cls in dir(module) if cls.endswith("Pruning") and cls != "Pruning" and not cls.startswith("_")])
+    return pruning_methods
+
+
+def _get_pruning_name(cls: Any) -> str:
+    name = cls.__name__
+    assert name.endswith("Pruning")
+    return name[:-7].lower()
+
+
+PRUNING = {_get_pruning_name(p): p for p in get_pruning_methods()}
+
+
+def validator_available() -> bool:
     return tools.command_available(["validate", "-h"])
 
 
-def find_domain(problem):
+def find_domain(problem: str) -> str:
     """
     This function tries to guess a domain file from a given problem file.
     It first uses a file called "domain.pddl" in the same directory as
@@ -107,7 +124,7 @@ def find_domain(problem):
     return domain
 
 
-def _parse(domain_file, problem_file):
+def _parse(domain_file: str, problem_file: str) -> Problem:
     # Parsing
     parser = Parser(domain_file, problem_file)
     logging.info(f"Parsing Domain {domain_file}")
@@ -122,42 +139,25 @@ def _parse(domain_file, problem_file):
     return problem
 
 
-def _ground(
-    problem, remove_statics_from_initial_state=True, remove_irrelevant_operators=True
-):
+def _ground(problem: Problem, remove_statics_from_initial_state: bool = True, remove_irrelevant_operators: bool = True) -> Task:
     logging.info(f"Grounding start: {problem.name}")
-    task = grounding.ground(
-        problem, remove_statics_from_initial_state, remove_irrelevant_operators
-    )
+    task = grounding.ground(problem, remove_statics_from_initial_state, remove_irrelevant_operators)
     logging.info(f"Grounding end: {problem.name}")
     logging.info("{} Variables created".format(len(task.facts)))
     logging.info("{} Operators created".format(len(task.operators)))
     return task
 
 
-def _search(task, search, heuristic, use_preferred_ops=False):
-    logging.info(f"Search start: {task.name}")
-    if heuristic:
-        if use_preferred_ops:
-            solution = search(task, heuristic, use_preferred_ops)
-        else:
-            solution = search(task, heuristic)
-    else:
-        solution = search(task)
-    logging.info(f"Search end: {task.name}")
-    return solution
-
-
-def write_solution(solution, filename):
+def write_solution(solution: List[Operator], filename: str):
     assert solution is not None
     with open(filename, "w") as file:
         for op in solution:
-            print(op.name, file=file)
+            print(op if isinstance(op, str) else op.name, file=file)
 
 
 def search_plan(
-    domain_file, problem_file, search, heuristic_class, use_preferred_ops=False
-):
+    domain_file: str, problem_file: str, search: type[Search], task_representation: str = "strips", task_transformation: Optional[type[TaskTransformation]] = None, **kwargs
+) -> List[Operator]:
     """
     Parses the given input files to a specific planner task and then tries to
     find a solution using the specified  search algorithm and heuristics.
@@ -171,30 +171,71 @@ def search_plan(
                             interface
     @return A list of actions that solve the problem
     """
-    problem = _parse(domain_file, problem_file)
-    task = _ground(problem)
-    heuristic = None
-    if not heuristic_class is None:
-        heuristic = heuristic_class(task)
-    search_start_time = time.process_time()
-    if use_preferred_ops and isinstance(heuristic, heuristics.hFFHeuristic):
-        solution = _search(task, search, heuristic, use_preferred_ops=True)
+    if task_representation == "strips":
+        if not domain_file or not problem_file:
+            raise ValueError("Domain and problem PDDL files must be specified for STRIPS representation")
+        problem = _parse(domain_file, problem_file)
+        task = _ground(problem)
+    elif task_representation == "factored":
+        if problem_file.endswith(".sas"):
+            sas_task: SASTask = open_sas_task(problem_file)
+            task_name = os.path.splitext(os.path.basename(problem_file))[0]
+        else:
+            pddl_task = open_pddl(domain_file, problem_file)
+            sas_task: SASTask = pddl_to_sas(pddl_task)
+            if logging.getLogger().isEnabledFor(logging.DEBUG):
+                sas_task.output(Path("output.sas").open("w"))
+            task_name = pddl_task.task_name
+        task = FactoredTask.from_sas_task(task_name, sas_task)
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            Path("task.dot").write_text(task.to_dot())
     else:
-        solution = _search(task, search, heuristic)
-    logging.info("Search time: {:.2}".format(time.process_time() - search_start_time))
+        raise ValueError(f"Unknown task representation: {task_representation}")
+    logging.info("done reading input!")
+    total_start_time = time.process_time()
+
+    if task_transformation is not None:
+        task = task_transformation().transform(task)
+        if logging.getLogger().isEnabledFor(logging.DEBUG):
+            Path("transformed_task.dot").write_text(task.to_dot())
+
+    # if not heuristic_class is None:
+    #     if qdom == 'none':
+    #         heuristic = heuristic_class(task)
+    #     elif qdom == 'qdom':
+    #         heuristic = QualifiedDominanceHeuristic(task, heuristic_class,
+    #                         intersect_original_factor=kwargs.get('intersect_original_factor', False),
+    #                         approximate_to_deterministic=kwargs.get('qdom_approx', False),
+    #                         comparison_strategy=kwargs.get('qdom_compare')
+    #         )
+    #     elif qdom == 'iqdom':
+    #         heuristic = InterdimensionalQualifiedDominance(task, heuristic_class,
+    #                         approximate_to_deterministic=kwargs.get('qdom_approx', False),
+    #                        comparison_strategy=kwargs.get('qdom_compare')
+    #        )
+    #     else:
+    #         assert False, f"Unknown qdom option: {qdom}"
+    # pruning = pruning_class(task)
+    search_start_time = time.process_time()
+    # if use_preferred_ops and isinstance(heuristic, heuristics.hFFHeuristic):
+    #     solution = _search(task, search, heuristic, pruning, search_space_drawer, use_preferred_ops=True)
+    # else:
+    #     solution = _search(task, search, heuristic, pruning, search_space_drawer)
+    solution = search(task).search()
+    cost = sum(task.get_action_cost(a) for a in solution) if solution else -1
+    logging.info(f"Plan cost: {cost if cost >= 0 else float('inf')}")
+    logging.info("Search time: {:.03}s".format(time.process_time() - search_start_time))
+    logging.info("Total time: {:.03}s".format(time.process_time() - total_start_time))
     return solution
 
 
-def validate_solution(domain_file, problem_file, solution_file):
+def validate_solution(domain_file: str, problem_file: str, solution_file: str):
     if not validator_available():
-        logging.info(
-            "validate could not be found on the PATH so the plan can "
-            "not be validated."
-        )
+        logging.info("validate could not be found on the PATH so the plan can " "not be validated.")
         return
 
     cmd = ["validate", domain_file, problem_file, solution_file]
-    exitcode = subprocess.call(cmd, stdout=subprocess.PIPE)
+    exitcode = subprocess.call(cmd)
 
     if exitcode == 0:
         logging.info("Plan correct")

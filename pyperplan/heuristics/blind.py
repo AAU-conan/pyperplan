@@ -15,21 +15,23 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 #
 
+from pyperplan.search.searchspace import SearchNode
+from pyperplan.task import Task
+
+from ..cli import cli_register
 from .heuristic_base import Heuristic
 
 
+@cli_register("hblind")
 class BlindHeuristic(Heuristic):
     """
     Implements a simple blind heuristic for convenience.
     It returns 0 if the goal was reached and 1 otherwise.
     """
 
-    def __init__(self, task):
-        super().__init__()
-        self.goals = task.goals
+    def __init__(self, task: Task):
+        super().__init__(task)
+        self.task = task
 
-    def __call__(self, node):
-        if all([(fact in node.state) for fact in self.goals]):
-            return 0
-        else:
-            return 1
+    def __call__(self, node: SearchNode):
+        return 0 if self.task.goal_reached(node.state) else 1

@@ -253,9 +253,7 @@ def test_sat_solve():
     )
 
     op_delete_pre = Operator("delete_pre", {"a"}, {"b"}, {"a"})
-    task_op_delete_pre = Task(
-        "op_delete_pre", {"a", "b"}, {"a"}, {"b"}, [op_delete_pre]
-    )
+    task_op_delete_pre = Task("op_delete_pre", {"a", "b"}, {"a"}, {"b"}, [op_delete_pre])
 
     # Miconic: prob00.pddl (2 floors, 1 person):
     # <Op (depart f1 p0), PRE: frozenset({'(lift-at f1)', '(boarded p0)'}),

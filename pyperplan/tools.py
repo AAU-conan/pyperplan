@@ -21,9 +21,10 @@ import os
 import subprocess
 import sys
 import traceback
+from typing import List
 
 
-def command_available(command):
+def command_available(command: List[str]):
     """Returns true iff command can be called without errors.
 
     command should be a list. For checking the availbability of a command it

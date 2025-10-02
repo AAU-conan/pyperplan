@@ -40,6 +40,6 @@ setup(
         "Programming Language :: Python :: 3.13",
         "Topic :: Scientific/Engineering",
     ],
-    install_requires=["wheel"],
+    install_requires=["wheel", "pulp"],
     python_requires=">=3.7",
 )

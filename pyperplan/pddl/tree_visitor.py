@@ -62,10 +62,7 @@ class Visitable:
         m = getattr(visitor, self._visitorName)
         # ensure that the method is callable
         if not hasattr(m, "__call__"):
-            raise ValueError(
-                "Error: cannot call undefined method: %s on "
-                "visitor" % self._visitorName
-            )
+            raise ValueError("Error: cannot call undefined method: %s on " "visitor" % self._visitorName)
         # and finally call the callback
         m(self)
 
@@ -218,11 +215,7 @@ class TraversePDDLDomain(PDDLVisitor):
                 a.accept(self)
                 action = self.get_in(a)
                 if action.name in self._actions:
-                    raise SemanticError(
-                        "Error: action with name "
-                        + action.name
-                        + " has already been defined"
-                    )
+                    raise SemanticError("Error: action with name " + action.name + " has already been defined")
                 self._actions[action.name] = action
 
         # Visit all constants.
@@ -231,9 +224,7 @@ class TraversePDDLDomain(PDDLVisitor):
                 c.accept(self)
 
         # Finally generate PDDL domain data structure.
-        self.domain = pddl.Domain(
-            node.name, self._types, self._predicates, self._actions, self._constants
-        )
+        self.domain = pddl.Domain(node.name, self._types, self._predicates, self._actions, self._constants)
 
     def visit_object(self, node):
         """Visits a PDDL object definition."""
@@ -241,13 +232,9 @@ class TraversePDDLDomain(PDDLVisitor):
         if type_name == None:
             type_name = "object"
         if not type_name in self._types:
-            raise SemanticError(
-                "Error: unknown type " + type_name + " used in object definition!"
-            )
+            raise SemanticError("Error: unknown type " + type_name + " used in object definition!")
         if node.name in self._constants:
-            raise SemanticError(
-                "Error: multiple defines of object with " "name " + node.name
-            )
+            raise SemanticError("Error: multiple defines of object with " "name " + node.name)
         # Add constant with its corresponding type to the constants dict.
         self._constants[node.name] = self._types[type_name]
 
@@ -282,11 +269,7 @@ class TraversePDDLDomain(PDDLVisitor):
             predicate = self.get_in(p)
             # Check for duplicate predicate definitions.
             if predicate.name in self._predicates:
-                raise SemanticError(
-                    "Error predicate with name "
-                    + predicate.name
-                    + " has already been defined"
-                )
+                raise SemanticError("Error predicate with name " + predicate.name + " has already been defined")
             # Add to predicate list.
             self._predicates[predicate.name] = predicate
 
@@ -313,9 +296,7 @@ class TraversePDDLDomain(PDDLVisitor):
             for t in node.types:
                 # Check whether they have been defined.
                 if not t in self._types:
-                    raise SemanticError(
-                        "Error unknown type " + t + " used in predicate definition"
-                    )
+                    raise SemanticError("Error unknown type " + t + " used in predicate definition")
                 typelist.append(self._types[t])
             # Store variable information (var_name, tuple(types)) in node.
             self.set_in(node, (node.name, tuple(typelist)))
@@ -354,11 +335,7 @@ class TraversePDDLDomain(PDDLVisitor):
         count = 0
         # Check for correct number of arguments.
         if len(c.children) != len(predDef.signature):
-            raise SemanticError(
-                "Error: wrong number of arguments for "
-                "predicate " + c.key + " in precondition of "
-                "action"
-            )
+            raise SemanticError("Error: wrong number of arguments for " "predicate " + c.key + " in precondition of " "action")
         # Apply to all arguments.
         for v in c.children:
             if isinstance(v.key, Variable):
@@ -379,17 +356,10 @@ class TraversePDDLDomain(PDDLVisitor):
             # Apply to all predicates in precondition.
             for c in formula.children:
                 if not isinstance(c.key, str):
-                    raise SemanticError(
-                        "Error predicate with non str key: "
-                        + "".join([c2.key.name + " " for c2 in formula.children])
-                    )
+                    raise SemanticError("Error predicate with non str key: " + "".join([c2.key.name + " " for c2 in formula.children]))
                 # Check whether predicate was defined.
                 if not c.key in self._predicates:
-                    raise SemanticError(
-                        "Error unknown predicate "
-                        + c.key
-                        + " used in precondition of action"
-                    )
+                    raise SemanticError("Error unknown predicate " + c.key + " used in precondition of action")
                 # Call helper.
                 self.add_precond(precond, c)
         else:
@@ -416,19 +386,14 @@ class TraversePDDLDomain(PDDLVisitor):
         if c.key == "not":
             # This is a negative effect, only one child allowed.
             if len(c.children) != 1:
-                raise SemanticError(
-                    "Error not statement with multiple " "children in effect of action"
-                )
+                raise SemanticError("Error not statement with multiple " "children in effect of action")
             nextPredicate = c.children[0]
             isNegative = True
         else:
             nextPredicate = c
         # Check whether predicate was defined previously.
         if not nextPredicate.key in self._predicates:
-            raise SemanticError(
-                "Error: unknown predicate %s used in effect "
-                "of action" % nextPredicate.key
-            )
+            raise SemanticError("Error: unknown predicate %s used in effect " "of action" % nextPredicate.key)
         if nextPredicate == None:
             raise SemanticError("Error: NoneType predicate used in effect of " "action")
         predDef = self._predicates[nextPredicate.key]
@@ -436,10 +401,7 @@ class TraversePDDLDomain(PDDLVisitor):
         count = 0
         # Check whether predicate is used with the correct signature.
         if len(nextPredicate.children) != len(predDef.signature):
-            raise SemanticError(
-                "Error: wrong number of arguments for "
-                "predicate " + nextPredicate.key + " in effect of action"
-            )
+            raise SemanticError("Error: wrong number of arguments for " "predicate " + nextPredicate.key + " in effect of action")
         # Apply to all parameters.
         for v in nextPredicate.children:
             if isinstance(v.key, Variable):
@@ -513,9 +475,7 @@ class TraversePDDLProblem(PDDLVisitor):
         # the supplied domain data structure.
         if node.domainName != self._domain.name:
             raise SemanticError(
-                "Error trying to parse problem file with "
-                "domain: %s together with a domain file that "
-                "specifies domain: %s" % (node.domainName, self._domain.name)
+                "Error trying to parse problem file with " "domain: %s together with a domain file that " "specifies domain: %s" % (node.domainName, self._domain.name)
             )
         # Apply to all object definitions.
         for o in node.objects:
@@ -530,29 +490,21 @@ class TraversePDDLProblem(PDDLVisitor):
         goal_list = self.get_in(node.goal)
 
         # Create the problem data structure.
-        self._problemDef = pddl.Problem(
-            node.name, self._domain, self._objects, init_list, goal_list
-        )
+        self._problemDef = pddl.Problem(node.name, self._domain, self._objects, init_list, goal_list)
 
     def visit_object(self, node):
         """Visits a PDDL-problem object definition."""
         type_def = None
         # Check for multiple definition of objects.
         if node.name in self._objects:
-            raise SemanticError(
-                "Error multiple defines of object with name " + node.name
-            )
+            raise SemanticError("Error multiple defines of object with name " + node.name)
         # Untyped objects get the standard type 'object'.
         if node.typeName == None:
             type_def = self._domain.types["object"]
         else:
             # Check whether used type was introduced in domain file.
             if not node.typeName in self._domain.types:
-                raise SemanticError(
-                    "Error: unknown type "
-                    + node.typeName
-                    + " used in object definition!"
-                )
+                raise SemanticError("Error: unknown type " + node.typeName + " used in object definition!")
             type_def = self._domain.types[node.typeName]
         self._objects[node.name] = type_def
 
@@ -575,19 +527,14 @@ class TraversePDDLProblem(PDDLVisitor):
         """
         # Check whether predicate was introduced in domain file.
         if not c.key in self._domain.predicates:
-            raise SemanticError(
-                "Error: unknown predicate " + c.key + " in goal definition"
-            )
+            raise SemanticError("Error: unknown predicate " + c.key + " in goal definition")
         # Get predicate from the domain data structure.
         predDef = self._domain.predicates[c.key]
         signature = list()
         count = 0
         # Check whether the predicate uses the correct signature.
         if len(c.children) != len(predDef.signature):
-            raise SemanticError(
-                "Error: wrong number of arguments for "
-                "predicate " + c.key + " in goal"
-            )
+            raise SemanticError("Error: wrong number of arguments for " "predicate " + c.key + " in goal")
         for v in c.children:
             signature.append((v.key, predDef.signature[count][1]))
             count += 1
@@ -602,18 +549,13 @@ class TraversePDDLProblem(PDDLVisitor):
         if formula.key == "and":
             for c in formula.children:
                 if not isinstance(c.key, str):
-                    raise SemanticError(
-                        "Error predicate with non str key: "
-                        + "".join([c2.key.name + " " for c2 in formula.children])
-                    )
+                    raise SemanticError("Error predicate with non str key: " + "".join([c2.key.name + " " for c2 in formula.children]))
                 # Call helper.
                 self.add_goal(goal, c)
         else:
             # Only a single predicate is allowed then (s.a.)
             if not formula.key in self._domain.predicates:
-                raise SemanticError(
-                    "Error: predicate in goal definition is " "not in CNF"
-                )
+                raise SemanticError("Error: predicate in goal definition is " "not in CNF")
             # Call helper.
             self.add_goal(goal, formula)
         self.set_in(node, goal)
@@ -627,10 +569,7 @@ class TraversePDDLProblem(PDDLVisitor):
             # Check whether predicate was introduced in objects or domain
             # constants.
             if not (o in self._objects or o in self._domain.constants):
-                raise SemanticError(
-                    "Error: object " + o + " referenced in "
-                    "problem definition - but not defined"
-                )
+                raise SemanticError("Error: object " + o + " referenced in " "problem definition - but not defined")
             elif o in self._objects:
                 o_type = self._objects[o]
             elif o in self._domain.constants:

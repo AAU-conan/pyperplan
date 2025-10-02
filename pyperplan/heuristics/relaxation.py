@@ -17,8 +17,13 @@
 
 import heapq
 import logging
+from typing import Any, List, Set, Tuple, Union
 
-from ..task import Operator, Task
+from pyperplan.search.searchspace import SearchNode
+from pyperplan.task import Task
+
+from ..cli import cli_register
+from ..task import Operator, STRIPSTask, Task
 from .heuristic_base import Heuristic
 
 
@@ -28,7 +33,7 @@ from .heuristic_base import Heuristic
 class RelaxedFact:
     """This class represents a relaxed fact."""
 
-    def __init__(self, name):
+    def __init__(self, name: str):
         """Construct a new relaxed fact.
 
         Keyword arguments:
@@ -57,7 +62,7 @@ class RelaxedFact:
 class RelaxedOperator:
     """This class represents a relaxed operator (no delete effects)."""
 
-    def __init__(self, name, preconditions, add_effects):
+    def __init__(self, name: str, preconditions: frozenset, add_effects: frozenset):
         """Construct a new relaxed operator.
 
         Keyword arguments:
@@ -87,7 +92,7 @@ class _RelaxationHeuristic(Heuristic):
     implementation of the hAdd heuristic.
     """
 
-    def __init__(self, task):
+    def __init__(self, task: STRIPSTask):
         """Construct a instance of _RelaxationHeuristic.
 
         Keyword arguments:
@@ -129,7 +134,7 @@ class _RelaxationHeuristic(Heuristic):
                 # helps also when the initial state is empty.
                 self.start_state.precondition_of.append(ro)
 
-    def __call__(self, node):
+    def __call__(self, node: SearchNode) -> int:
         """This function is called whenever the heuristic needs to be computed.
 
         Keyword arguments:
@@ -151,9 +156,7 @@ class _RelaxationHeuristic(Heuristic):
         for fact in state:
             # Its order is determined by the distance the facts.
             # As a tie breaker we use a simple counter.
-            heapq.heappush(
-                heap, (self.facts[fact].distance, self.tie_breaker, self.facts[fact])
-            )
+            heapq.heappush(heap, (self.facts[fact].distance, self.tie_breaker, self.facts[fact]))
             self.tie_breaker += 1
 
         # Call the Dijkstra search that performs the forward pass.
@@ -164,7 +167,7 @@ class _RelaxationHeuristic(Heuristic):
 
         return h_value
 
-    def init_distance(self, state):
+    def init_distance(self, state: Set[str]):
         """
         This function resets all member variables that store information that
         needs to be recomputed for each call of the heuristic.
@@ -191,7 +194,7 @@ class _RelaxationHeuristic(Heuristic):
         for operator in self.operators:
             operator.counter = len(operator.preconditions)
 
-    def get_cost(self, operator, pre):
+    def get_cost(self, operator: RelaxedOperator, pre: RelaxedFact) -> Tuple[None, int]:
         """This function calculated the cost of applying an operator.
 
         For hMax and hAdd this nothing has to be changed here, but to use
@@ -201,9 +204,7 @@ class _RelaxationHeuristic(Heuristic):
         if operator.preconditions:
             # If this operator has preconditions, we sum / maximize over the
             # heuristic values of all preconditions.
-            cost = self.eval(
-                [self.facts[pre].distance for pre in operator.preconditions]
-            )
+            cost = self.eval([self.facts[pre].distance for pre in operator.preconditions])
         else:
             # If there are no preconditions for this operator, its cost is 0.
             cost = 0
@@ -212,7 +213,7 @@ class _RelaxationHeuristic(Heuristic):
         # unioned set is returned.
         return None, cost + operator.cost
 
-    def calc_goal_h(self):
+    def calc_goal_h(self) -> int:
         """This function calculates the heuristic value of the whole goal.
 
         As get_cost, it is makes use of the eval function, and has to be
@@ -224,14 +225,14 @@ class _RelaxationHeuristic(Heuristic):
         else:
             return 0
 
-    def finished(self, achieved_goals, queue):
+    def finished(self, achieved_goals: Set[str], queue: List[Union[Tuple[int, int, RelaxedFact], Any]]) -> bool:
         """
         This function is used as a stopping criterion for the Dijkstra search,
         which differs for different heuristics.
         """
         return achieved_goals == self.goals or not queue
 
-    def dijkstra(self, queue):
+    def dijkstra(self, queue: List[Tuple[int, int, RelaxedFact]]):
         """This function is an implementation of a Dijkstra search.
 
         For efficiency reasons, it is used instead of an explicit graph
@@ -267,21 +268,20 @@ class _RelaxationHeuristic(Heuristic):
                                 neighbor.sa_set = unioned_sets
                                 neighbor.cheapest_achiever = operator
                                 # And push it on the queue.
-                                heapq.heappush(
-                                    queue, (tmp_dist, self.tie_breaker, neighbor)
-                                )
+                                heapq.heappush(queue, (tmp_dist, self.tie_breaker, neighbor))
                                 self.tie_breaker += 1
                 # Finally the fact is marked as expanded.
                 fact.expanded = True
 
 
+@cli_register("hadd")
 class hAddHeuristic(_RelaxationHeuristic):
     """This class is an implementation of the hADD heuristic.
 
     It derives from the _RelaxationHeuristic class.
     """
 
-    def __init__(self, task):
+    def __init__(self, task: Task):
         """
         To make this class an implementation of hADD, apart from deriving from
         _RelaxationHeuristic,  we only need to set eval to sum().
@@ -290,13 +290,14 @@ class hAddHeuristic(_RelaxationHeuristic):
         self.eval = sum
 
 
+@cli_register("hmax")
 class hMaxHeuristic(_RelaxationHeuristic):
     """This class is an implementation of the hMax heuristic.
 
     It derives from the _RelaxationHeuristic class.
     """
 
-    def __init__(self, task):
+    def __init__(self, task: Task):
         """
         To make this class an implementation of hADD, apart from deriving from
         _RelaxationHeuristic, we only need to set eval to max().
@@ -305,13 +306,14 @@ class hMaxHeuristic(_RelaxationHeuristic):
         self.eval = max
 
 
+@cli_register("hsa")
 class hSAHeuristic(_RelaxationHeuristic):
     """This class is an implementation of the hSA heuristic.
 
     It derives from the _RelaxationHeuristic class.
     """
 
-    def get_cost(self, operator, pre):
+    def get_cost(self, operator: RelaxedOperator, pre: RelaxedFact) -> Tuple[Set[str], int]:
         """
         This function has to be overwritten, because the hSA heuristic not
         only relies on a real valued distance, but also on a set of operators
@@ -326,11 +328,7 @@ class hSAHeuristic(_RelaxationHeuristic):
 
         if operator.preconditions:
             # Collect the sa-sets from all preconditions in a list.
-            l = [
-                self.facts[pre].sa_set
-                for pre in operator.preconditions
-                if self.facts[pre].sa_set is not None
-            ]
+            l = [self.facts[pre].sa_set for pre in operator.preconditions if self.facts[pre].sa_set is not None]
             if l:
                 # Union all these sets.
                 unioned_sets = set.union(*l)
@@ -343,7 +341,7 @@ class hSAHeuristic(_RelaxationHeuristic):
         unioned_sets.add(operator.name)
         return (unioned_sets, cost + operator.cost)
 
-    def calc_goal_h(self):
+    def calc_goal_h(self) -> int:
         """
         This function has to be overwritten, because the hSA heuristic not only
         relies on a real valued distance, but also on a set of operators that
@@ -353,11 +351,7 @@ class hSAHeuristic(_RelaxationHeuristic):
         """
         if self.goals:
             # Collect the sa-sets of all facts that are part of the goal.
-            l = [
-                self.facts[fact].sa_set
-                for fact in self.goals
-                if self.facts[fact].sa_set is not None
-            ]
+            l = [self.facts[fact].sa_set for fact in self.goals if self.facts[fact].sa_set is not None]
             # Check whether all subgoals are fulfilled.
             if len(l) == len(self.goals):
                 # Union all these sets and take the length of the union as
@@ -371,13 +365,14 @@ class hSAHeuristic(_RelaxationHeuristic):
             return 0
 
 
+@cli_register("hff")
 class hFFHeuristic(_RelaxationHeuristic):
     """This class is an implementation of the hFF heuristic.
 
     It derives from the _RelaxationHeuristic class.
     """
 
-    def __init__(self, task):
+    def __init__(self, task: Task):
         """Construct a hFFHeuristic.
 
         FF uses same forward pass as hAdd.
@@ -400,9 +395,7 @@ class hFFHeuristic(_RelaxationHeuristic):
         for fact in state:
             # Its order is determined by the distance the facts.
             # As a tie breaker we use a simple counter.
-            heapq.heappush(
-                heap, (self.facts[fact].distance, self.tie_breaker, self.facts[fact])
-            )
+            heapq.heappush(heap, (self.facts[fact].distance, self.tie_breaker, self.facts[fact]))
             self.tie_breaker += 1
 
         # Call the Dijkstra search that performs the forward pass.
@@ -414,7 +407,7 @@ class hFFHeuristic(_RelaxationHeuristic):
         else:
             return h_value
 
-    def calc_goal_h(self, return_relaxed_plan=False):
+    def calc_goal_h(self, return_relaxed_plan: bool = False) -> int:
         """
         This function has to be overwritten, because the hFF heuristic needs an
         additional backward pass.
@@ -436,10 +429,7 @@ class hFFHeuristic(_RelaxationHeuristic):
                 fact = q.pop()
                 # Check whether this fact has a cheapest achiever and that it
                 # is not already expanded
-                if (
-                    fact.cheapest_achiever is not None
-                    and not fact.cheapest_achiever in relaxed_plan
-                ):
+                if fact.cheapest_achiever is not None and not fact.cheapest_achiever in relaxed_plan:
                     # Add all preconditions of the cheapest achiever to the
                     # queue.
                     for pre in fact.cheapest_achiever.preconditions:

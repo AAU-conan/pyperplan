@@ -18,15 +18,20 @@
 """Basic functions for parsing simple Lisp files."""
 
 
+from io import TextIOWrapper
+from typing import Any, Iterator, List
+
+from pyperplan.pddl.lisp_iterators import LispIterator
+
 from .errors import ParseError
 from .lisp_iterators import LispIterator
 
 
-def parse_lisp_iterator(input):
+def parse_lisp_iterator(input: TextIOWrapper) -> LispIterator:
     return LispIterator(parse_nested_list(input))
 
 
-def parse_nested_list(input_file):
+def parse_nested_list(input_file: TextIOWrapper) -> List[Any]:
     tokens = _tokenize(input_file)
     next_token = next(tokens)
     if next_token != "(":
@@ -37,7 +42,7 @@ def parse_nested_list(input_file):
     return result
 
 
-def _tokenize(input_file):
+def _tokenize(input_file: TextIOWrapper):
     for line in input_file:
         line = line.partition(";")[0]  # Strip comments.
         line = line.replace("(", " ( ").replace(")", " ) ").replace("?", " ?")
@@ -45,7 +50,7 @@ def _tokenize(input_file):
             yield token.lower()
 
 
-def _parse_list_aux(tokenstream):
+def _parse_list_aux(tokenstream: Iterator[Any]):
     # Invariant: leading "(" has already been swallowed.
     for token in tokenstream:
         if token == ")":  # List is closed.

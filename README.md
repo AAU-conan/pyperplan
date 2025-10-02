@@ -1,5 +1,7 @@
 **Pyperplan** is a lightweight STRIPS planner written in Python.
 
+This is a fork of the original Pyperplan repository implementing additional features such as SAS+ support, factored task representation, dominance pruning and qualified dominance.
+
 Please note that Pyperplan deliberately prefers clean code over fast
 code. It is designed to be used as a teaching or prototyping tool. If
 you use it for paper experiments, please state clearly that Pyperplan
@@ -19,9 +21,9 @@ Pyperplan requires [Python](https://python.org) >= 3.7.
 
 # Installation
 
-From the Python package index (PyPI):
+From the GitHub repository:
 
-    pip install pyperplan
+    pip install git+https://github.com/AAU-conan/pyperplan
 
 From inside a repository clone:
 
@@ -41,11 +43,19 @@ The domain file can be omitted, in which case the planner will attempt
 to guess its name based on the problem file. If a plan is found, it is
 stored alongside the problem file with a .soln extension.
 
+It also support SAS+ input files, but only for the `factored` task representation. Example:
+
+    pyperplan benchmarks/sas/blocks-4.sas -t factored
+
 By default, the planner performs a blind breadth-first search, which
 does not scale very well. Heuristic search algorithms are available. For
 example, to use greedy-best-first search with the FF heuristic, run
 
-    pyperplan -H hff -s gbf DOMAIN PROBLEM
+    pyperplan -s "gbfs(hff)" DOMAIN PROBLEM
+
+The argument to the `-s` option is an expression that constructs a search algorithm. The `gbfs` is translated into `GreedyBestFirstSearch` and `hff` into `hFFHeuristic`. The full names can also be used. It is then constructed as python classes, this means you can parse options to them like normal python constructors. For example, to run weighted A\* with a weight of 10 and the optimal cost partitioning heuristic, run
+
+    -s "wastar(weight=10,heuristic=OptimalCostPartitioning)" -t factored
 
 For a list of available search algorithms and heuristics, run
 
@@ -81,8 +91,8 @@ The original authors of Pyperplan are, in alphabetical order:
 The instructors of the course in which Pyperplan was created were Malte
 Helmert and Robert Mattmüller.
 
-For questions and feedback, please start a new
-[discussion](https://github.com/aibasel/pyperplan/discussions).
+This fork is created by Rasmus Grønkjær Tollund.
+
 
 # Citing Pyperplan
 

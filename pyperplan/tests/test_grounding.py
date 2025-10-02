@@ -40,17 +40,11 @@ types = {
 # predicates:
 predicate_car_orig = Predicate("at", [("car", types["car"]), ("orig", types["city"])])
 predicate_car_dest = Predicate("at", [("car", types["car"]), ("dest", types["city"])])
-predicate_veh_orig = Predicate(
-    "at", [("vehicle", types["vehicle"]), ("orig", types["city"])]
-)
-predicate_veh_dest = Predicate(
-    "at", [("vehicle", types["vehicle"]), ("dest", types["city"])]
-)
+predicate_veh_orig = Predicate("at", [("vehicle", types["vehicle"]), ("orig", types["city"])])
+predicate_veh_dest = Predicate("at", [("vehicle", types["vehicle"]), ("dest", types["city"])])
 predicate_in = Predicate("in", [("car", types["car"]), ("in", types["city"])])
 # predicate which does not occur in any operator:
-predicate_car_color = Predicate(
-    "car_color", [("car", types["car"]), ("color", types["color"])]
-)
+predicate_car_color = Predicate("car_color", [("car", types["car"]), ("color", types["color"])])
 
 predicates = {
     "at": predicate_car_dest,
@@ -97,9 +91,7 @@ goal_state = [
 
 # domain and problem
 standard_domain = Domain("test_domain_statics", types, predicates, actions)
-standard_problem = Problem(
-    "test_problem_statics", standard_domain, objects, initial_state, goal_state
-)
+standard_problem = Problem("test_problem_statics", standard_domain, objects, initial_state, goal_state)
 
 
 def test_statics1():
@@ -120,9 +112,7 @@ def test_statics1():
 
     predicate_orig = Predicate("at", [("car", types["car"]), ("dest", types["city"])])
     predicate_dest = Predicate("at", [("car", types["car"]), ("orig", types["city"])])
-    predicate_in = Predicate(
-        "in", [("city", types["city"]), ("country", types["country"])]
-    )
+    predicate_in = Predicate("in", [("city", types["city"]), ("country", types["country"])])
 
     action_drive_car = get_action(
         "DRIVE-CAR",
@@ -235,11 +225,7 @@ def test_operators():
         "CONSTANT-ACTION",
         [("my_car", [types["my_car"]]), ("city", [types["city"]])],
         [],
-        [
-            Predicate(
-                "in", [("basel", [types["city"]]), ("switzerland", [types["country"]])]
-            )
-        ],
+        [Predicate("in", [("basel", [types["city"]]), ("switzerland", [types["country"]])])],
         [],
     )
 
@@ -265,36 +251,16 @@ def test_operators():
 
     grounded_initial_state = grounding._get_partial_state(initial_state)
 
-    grounded_drive_car = list(
-        grounding._ground_action(action_drive_car, type_map, [], grounded_initial_state)
-    )
-    grounded_drive_vehicle = list(
-        grounding._ground_action(
-            action_drive_vehicle, type_map, [], grounded_initial_state
-        )
-    )
-    grounded_add_delete = list(
-        grounding._ground_action(
-            action_add_delete, type_map, [], grounded_initial_state
-        )
-    )
-    grounded_only_delete = list(
-        grounding._ground_action(
-            action_only_delete, type_map, [], grounded_initial_state
-        )
-    )
-    grounded_delete = list(
-        grounding._ground_action(action_delete, type_map, [], grounded_initial_state)
-    )
+    grounded_drive_car = list(grounding._ground_action(action_drive_car, type_map, [], grounded_initial_state))
+    grounded_drive_vehicle = list(grounding._ground_action(action_drive_vehicle, type_map, [], grounded_initial_state))
+    grounded_add_delete = list(grounding._ground_action(action_add_delete, type_map, [], grounded_initial_state))
+    grounded_only_delete = list(grounding._ground_action(action_only_delete, type_map, [], grounded_initial_state))
+    grounded_delete = list(grounding._ground_action(action_delete, type_map, [], grounded_initial_state))
 
     domain = Domain(
         "test_domain",
         types,
-        {
-            "in": Predicate(
-                "in", [("city", types["city"]), ("country", types["country"])]
-            )
-        },
+        {"in": Predicate("in", [("city", types["city"]), ("country", types["country"])])},
         {"action-constant": action_constant},
         {"my_car": types["car"]},
     )
@@ -315,12 +281,8 @@ def test_operators():
 
 
 def test_create_operator():
-    statics = grounding._get_statics(
-        standard_domain.predicates.values(), [action_drive_car]
-    )
-    initial_state = [
-        Predicate("at", [("ford", types["car"]), ("freiburg", types["city"])])
-    ]
+    statics = grounding._get_statics(standard_domain.predicates.values(), [action_drive_car])
+    initial_state = [Predicate("at", [("ford", types["car"]), ("freiburg", types["city"])])]
 
     operator = grounding._create_operator(
         action_drive_car,
@@ -336,10 +298,7 @@ def test_create_operator():
 
 def test_get_grounded_string():
     grounded_string = "(DRIVE-CAR ford freiburg berlin)"
-    assert (
-        grounding._get_grounded_string("DRIVE-CAR", ["ford", "freiburg", "berlin"])
-        == grounded_string
-    )
+    assert grounding._get_grounded_string("DRIVE-CAR", ["ford", "freiburg", "berlin"]) == grounded_string
 
 
 def test_ground():
@@ -467,11 +426,7 @@ def test_regression():
     # coded input:
     type_object = Type("object", None)
     types = {"object": type_object}
-    predicates = {
-        "the_predicate": Predicate(
-            "the-predicate", [("v1", type_object), ("v2", type_object)]
-        )
-    }
+    predicates = {"the_predicate": Predicate("the-predicate", [("v1", type_object), ("v2", type_object)])}
     constants = {"x": type_object}
     actions = {
         "theaction": get_action(

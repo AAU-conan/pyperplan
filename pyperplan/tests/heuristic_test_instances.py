@@ -75,9 +75,7 @@ def _gen_h_values(initial_state, plan, heuristic):
     yield h_val
 
 
-def gen_heuristic_test(
-    dom, prob, search_class, heuristic_class, h_values_plan, plan_length=None
-):
+def gen_heuristic_test(dom, prob, search_class, heuristic_class, h_values_plan, plan_length=None):
     parser = Parser("")
     parser.domInput = dom
     parser.probInput = prob
@@ -115,6 +113,4 @@ def gen_blocks_test_astar(heuristic_class, h_values_plan, plan_length):
 
 
 def gen_blocks_test_ehc(heuristic_class, h_values_plan, plan_length):
-    return gen_blocks_test1(
-        enforced_hillclimbing_search, heuristic_class, h_values_plan, plan_length
-    )
+    return gen_blocks_test1(enforced_hillclimbing_search, heuristic_class, h_values_plan, plan_length)

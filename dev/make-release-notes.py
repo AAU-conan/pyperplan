@@ -17,10 +17,7 @@ def add_to_release_notes(line):
 with open(CHANGELOG) as f:
     first_line = next(f)
     if not re.match(HEADER_REGEX, first_line):
-        sys.exit(
-            f'First changelog line "{first_line.rstrip()}" must '
-            f'start with "{HEADER_REGEX.rstrip()}"'
-        )
+        sys.exit(f'First changelog line "{first_line.rstrip()}" must ' f'start with "{HEADER_REGEX.rstrip()}"')
     notes_list.extend([first_line[2:], "\n"])
     for line in f:
         if not line.strip():

@@ -22,36 +22,28 @@ Implements the iterative deepening search algorithm.
 from collections import deque
 import logging
 
-
-def iterative_deepening_search(task, *args):
-    """
-    Searches for a plan on a task using iterative deepening search. Uses loop
-    detection.
-    The function creates an object of the IterativeDeepeningSearchAlgorithm
-    class and calls the corresponding search function.
-
-    @param task: The planning task to solve.
-    @param args: Additional arguments for the search.
-    @return: The solution as a list of operators or None if the task is
-    unsolvable.
-    """
-    searcher = IterativeDeepeningSearchAlgorithm()
-    return searcher.search(task, *args)
+from pyperplan.cli import cli_register
+from pyperplan.search.search import Search
+from pyperplan.task import Task
 
 
-class IterativeDeepeningSearchAlgorithm:
+@cli_register("ids")
+class IterativeDeepeningSearch(Search):
     """
     Searches for a plan on a task using iterative deepening search.
     """
 
-    def __init__(self):
+    def __init__(self, task: Task, maxdepth: int = 100000):
         # stores the maximal reachable depth, needed to terminate if the goal
         # is not reachable
+        super().__init__(task)
+        self.task = task
         self.maxreacheddepth = 0
         # number of explored nodes during search
         self.explorednodes = 0
+        self.maxdepth = maxdepth
 
-    def search(self, task, maxdepth=1000000):
+    def search(self):
         """
         Searches for a plan on a task using iterative deepening search. Uses
         loop detection.
@@ -63,7 +55,7 @@ class IterativeDeepeningSearchAlgorithm:
                  unsolvable.
         """
         # testing the first case, initial is a goal
-        if task.goal_reached(task.initial_state):
+        if self.task.goal_reached(self.task.initial_state):
             self.print_search_results(0, 0)
             return []
         # loop detection
@@ -71,10 +63,10 @@ class IterativeDeepeningSearchAlgorithm:
         # actual search depth
         depth = 1
         # run until at goal or fail to explore to the given depth
-        while depth < maxdepth:
+        while depth < self.maxdepth:
             self.maxreacheddepth = 0
             self.explorednodes = 0
-            plan = self.deepening_search_step(task, task.initial_state, depth, 0, path)
+            plan = self.deepening_search_step(self.task, self.task.initial_state, depth, 0, path)
             if plan is not None:
                 # plan comes in the wrong order
                 plan.reverse()
@@ -93,9 +85,7 @@ class IterativeDeepeningSearchAlgorithm:
         return None
 
     def print_search_results(self, depth, planlength):
-        logging.info(
-            "iterative_deepening_search: depth=%d planlength=%d " % (depth, planlength)
-        )
+        logging.info("iterative_deepening_search: depth=%d planlength=%d " % (depth, planlength))
         logging.info("%d Nodes expanded" % self.explorednodes)
 
     def deepening_search_step(self, task, state, depth, step, path):
@@ -126,9 +116,7 @@ class IterativeDeepeningSearchAlgorithm:
                         self.maxreacheddepth = nextstep
                         return [operator]
                     else:
-                        plan = self.deepening_search_step(
-                            task, successor_state, depth, nextstep, path
-                        )
+                        plan = self.deepening_search_step(task, successor_state, depth, nextstep, path)
                         if plan is not None:
                             # extracting the plan and terminating
                             plan.append(operator)

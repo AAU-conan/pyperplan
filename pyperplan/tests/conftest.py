@@ -2,9 +2,7 @@ import pytest
 
 
 def pytest_addoption(parser):
-    parser.addoption(
-        "--slow", action="store_true", default=False, help="Also run slow tests"
-    )
+    parser.addoption("--slow", action="store_true", default=False, help="Also run slow tests")
 
 
 def pytest_runtest_setup(item):

@@ -22,16 +22,31 @@
 import argparse
 import logging
 import os
+from pathlib import Path
 import sys
 
+# These imports look unused, but are not. Module discovery explores the modules, and translate adds a path to sys.path.
+import pyperplan.cli # isort: skip
+import pyperplan.module_discovery # isort: skip
+import pyperplan.translate.translate # isort: skip
+
+from pyperplan.cli import cli_constructor
 from pyperplan.planner import (
     find_domain,
-    HEURISTICS,
     search_plan,
-    SEARCHES,
     validate_solution,
     write_solution,
 )
+from pyperplan.search.search import Search
+from pyperplan.task_transformation.task_transformation import TaskTransformation
+
+def no_traceback_memoryerror(exc_type, exc_value, exc_tb):
+    if exc_type is MemoryError:
+        print("Memory limit reached.")
+    else:
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+
+sys.excepthook = no_traceback_memoryerror
 
 
 def main():
@@ -45,75 +60,88 @@ def main():
         names = [n.replace(omit_string, "").replace("_", " ") for n in names]
         return ", ".join(names)
 
-    search_names = get_callable_names(SEARCHES.values(), "_search")
-
-    argparser = argparse.ArgumentParser(
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter
-    )
+    argparser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     argparser.add_argument(dest="domain", nargs="?")
     argparser.add_argument(dest="problem")
-    argparser.add_argument("-l", "--loglevel", choices=log_levels, default="info")
     argparser.add_argument(
-        "-H",
-        "--heuristic",
-        choices=HEURISTICS.keys(),
-        help="Select a heuristic",
-        default="hff",
+        "--plan-file",
+        type=Path,
+        help="File path for the plan",
+        default=None,
     )
+    argparser.add_argument("-l", "--loglevel", choices=log_levels, default="info")
     argparser.add_argument(
         "-s",
         "--search",
-        choices=SEARCHES.keys(),
-        help=f"Select a search algorithm from {search_names}",
+        type=cli_constructor(Search),
+        help=f"",
         default="bfs",
     )
+    argparser.add_argument(
+        "-t",
+        "--task-representation",
+        choices=["strips", "factored"],
+        help="Select the task representation to use",
+        default="strips",
+    )
+    argparser.add_argument("-T", "--task-transformation", type=cli_constructor(TaskTransformation), help=f"Task transformation to apply before searching.", default=None)
+    argparser.add_argument(
+        "--draw-search-space",
+        choices=["none", "graph"],
+        default="none",
+        help="Draw the search space to a file (search_space.dot)",
+    )
+    argparser.add_argument("--intersect-original-factor", action="store_true")
     args = argparser.parse_args()
 
     logging.basicConfig(
         level=getattr(logging, args.loglevel.upper()),
-        format="%(asctime)s %(levelname)-8s %(message)s",
+        format="%(relativeCreated)dms %(levelname)-8s %(message)s",
         stream=sys.stdout,
     )
 
-    hffpo_searches = ["gbf", "wastar", "ehs"]
-    if args.heuristic == "hffpo" and args.search not in hffpo_searches:
-        print(
-            "ERROR: hffpo can currently only be used with %s\n" % hffpo_searches,
-            file=sys.stderr,
-        )
-        argparser.print_help()
-        sys.exit(2)
+    # hffpo_searches = ["gbf", "wastar", "ehs"]
+    # if args.heuristic == "hffpo" and args.search not in hffpo_searches:
+    #     print(
+    #         "ERROR: hffpo can currently only be used with %s\n" % hffpo_searches,
+    #         file=sys.stderr,
+    #     )
+    #     argparser.print_help()
+    #     sys.exit(2)
 
     args.problem = os.path.abspath(args.problem)
-    if args.domain is None:
+    if args.problem.endswith(".sas"):
+        pass
+    elif args.domain is None:
         args.domain = find_domain(args.problem)
     else:
         args.domain = os.path.abspath(args.domain)
 
-    search = SEARCHES[args.search]
-    heuristic = HEURISTICS[args.heuristic]
-
     if args.search in ["bfs", "ids", "sat"]:
         heuristic = None
 
-    logging.info("using search: %s" % search.__name__)
-    logging.info("using heuristic: %s" % (heuristic.__name__ if heuristic else None))
-    use_preferred_ops = args.heuristic == "hffpo"
+    # use_preferred_ops = args.heuristic == "hffpo"
+    search = args.search
+    delattr(args, "search")
     solution = search_plan(
         args.domain,
         args.problem,
         search,
-        heuristic,
-        use_preferred_ops=use_preferred_ops,
+        # use_preferred_ops=use_preferred_ops,
+        **args.__dict__,
     )
 
     if solution is None:
         logging.warning("No solution could be found")
     else:
-        solution_file = args.problem + ".soln"
         logging.info("Plan length: %s" % len(solution))
-        write_solution(solution, solution_file)
-        validate_solution(args.domain, args.problem, solution_file)
+        if args.plan_file:
+            solution_file = args.plan_file
+            write_solution(solution, solution_file)
+            if ".sas" not in args.problem:
+                validate_solution(args.domain, args.problem, solution_file)
+            else:
+                logging.info("Cannot validate plans for SAS files.")
 
 
 if __name__ == "__main__":

@@ -11,9 +11,7 @@ from pyperplan import planner
 from pyperplan.search import breadth_first_search
 
 
-benchmarks = os.path.abspath(
-    os.path.join(os.path.abspath(__file__), "../../../benchmarks")
-)
+benchmarks = os.path.abspath(os.path.join(os.path.abspath(__file__), "../../../benchmarks"))
 
 # Collect problem files
 problems = sorted(glob(os.path.join(benchmarks, "*", "task*.pddl")))
@@ -39,10 +37,7 @@ def ground_problem(problem_file):
 def run_planner(problem_file):
     domain_file = planner.find_domain(problem_file)
     print("Searching solution for", domain_file, problem_file)
-    assert (
-        planner.search_plan(domain_file, problem_file, breadth_first_search, None)
-        is not None
-    )
+    assert planner.search_plan(domain_file, problem_file, breadth_first_search, None) is not None
 
 
 @pytest.mark.slow

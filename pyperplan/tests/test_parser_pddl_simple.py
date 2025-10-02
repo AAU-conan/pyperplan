@@ -164,15 +164,9 @@ def test_parseFormula():
     formula = parse_formula(iter)
     assert formula.key == "and"
     assert [c.key for c in formula.children] == ["on", "true", "free"]
-    assert [
-        c.key.name for c in formula.children[0].children if c.type == TypeVariable
-    ] == ["?x"]
-    assert [c.key for c in formula.children[0].children if c.type == TypeConstant] == [
-        "table"
-    ]
-    assert [
-        c.key.name for c in formula.children[2].children if c.type == TypeVariable
-    ] == ["?x"]
+    assert [c.key.name for c in formula.children[0].children if c.type == TypeVariable] == ["?x"]
+    assert [c.key for c in formula.children[0].children if c.type == TypeConstant] == ["table"]
+    assert [c.key.name for c in formula.children[2].children if c.type == TypeVariable] == ["?x"]
     assert [c for c in formula.children[1].children] == []
 
 

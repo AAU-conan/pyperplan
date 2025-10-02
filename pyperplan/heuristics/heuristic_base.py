@@ -14,9 +14,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>
 #
+from pyperplan.task import Task
 
 
 class Heuristic:
+    def __init__(self, task: Task):
+        pass
+
     def __call__(self, node):
         """
         This function should calculate the heuristic value based on the current
